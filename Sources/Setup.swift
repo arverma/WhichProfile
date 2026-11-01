@@ -31,6 +31,10 @@ func encodeConfig(_ config: Config) throws -> Data {
     return try encoder.encode(config)
 }
 
+private func describe(_ profiles: [ConfiguredProfile]) -> String {
+    profiles.map { "  \($0.dir)  →  \($0.name ?? $0.dir)\n" }.joined()
+}
+
 /// Runs the interactive setup. Returns true if a config file was written.
 @discardableResult
 func runSetup(io: SetupIO, detect: () -> [Profile]?, path: String = configPath) -> Bool {
@@ -60,22 +64,46 @@ func runSetup(io: SetupIO, detect: () -> [Profile]?, path: String = configPath) 
     } else {
         io.write("Chrome's profile list can't be read (macOS protects other apps' data), so enter your\n")
         io.write("profiles by hand. To find a profile's directory: open it in Chrome, go to chrome://version,\n")
-        io.write("and take the last part of \"Profile Path\" (for example Default or Profile 3).\n")
-        io.write("Press Return on an empty directory to finish.\n\n")
-        var entered: [ConfiguredProfile] = []
+        io.write("and take the last part of \"Profile Path\" (for example Default or Profile 3).\n\n")
+
+        var entered = config.profiles
+        if !entered.isEmpty {
+            io.write("Current profiles:\n\(describe(entered))\n")
+            guard let keep = ask("Keep these and add more? [Y/n] (n starts over) ") else { return false }
+            if keep.lowercased().hasPrefix("n") { entered = [] }
+            io.write("\n")
+        }
+        io.write("Enter a directory to add a profile, or an existing one to rename it.\n")
+        io.write("Type -<directory> (for example -Profile 3) to remove one.\n\n")
+
         while true {
-            guard let dir = ask("Profile directory #\(entered.count + 1): ") else { return false }
-            if dir.isEmpty { break }
-            if !isValidProfileDir(dir) {
+            if !entered.isEmpty { io.write("Profiles so far:\n\(describe(entered))") }
+            let hint = entered.isEmpty ? "Profile directory" : "Another profile directory, or Return to finish"
+            guard let input = ask("\(hint): ") else { return false }
+            if input.isEmpty { break }
+
+            if input.hasPrefix("-") {
+                let dir = String(input.dropFirst()).trimmingCharacters(in: .whitespaces)
+                if let i = entered.firstIndex(where: { $0.dir == dir }) {
+                    entered.remove(at: i)
+                    io.write("  Removed \(dir).\n")
+                } else {
+                    io.write("  No profile \"\(dir)\" to remove.\n")
+                }
+                continue
+            }
+            guard isValidProfileDir(input) else {
                 io.write("  That doesn't look like a profile directory name; try again.\n")
                 continue
             }
-            if entered.contains(where: { $0.dir == dir }) {
-                io.write("  Already added.\n")
-                continue
+            if let i = entered.firstIndex(where: { $0.dir == input }) {
+                let current = entered[i].name ?? input
+                guard let name = ask("  \(input) is already listed as \"\(current)\". New name (Return to keep): ") else { return false }
+                if !name.isEmpty { entered[i].name = name }
+            } else {
+                guard let name = ask("  Name shown in the popup (Return to use \"\(input)\"): ") else { return false }
+                entered.append(ConfiguredProfile(dir: input, name: name.isEmpty ? nil : name))
             }
-            guard let name = ask("  Name shown in the popup [\(dir)]: ") else { return false }
-            entered.append(ConfiguredProfile(dir: dir, name: name.isEmpty ? nil : name))
         }
         if entered.isEmpty {
             io.write("\nNo profiles entered. Nothing was written.\n")

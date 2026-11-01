@@ -134,18 +134,41 @@ check(answers.hidden == ["Profile 1"] && answers.labels == ["Profile 2": "Two!"]
 check(applyDetectionAnswers(base, answers: ["Default", "", ""]).labels.isEmpty, "re-typing the same name is not a label")
 
 // manual entry, with an invalid and a duplicate directory along the way
-let manual = runScripted(["Profile 3", "Work", "../x", "Profile 3", "Default", "", "", "y"], detect: nil)
+let manual = runScripted(["Profile 3", "Work", "../x", "Default", "", "", "y"], detect: nil)
 check(manual.0, "manual setup writes the config")
 let manualConfig = loadConfig(path: manual.2)
 check(manualConfig.profiles == [ConfiguredProfile(dir: "Profile 3", name: "Work"), ConfiguredProfile(dir: "Default", name: nil)],
       "manual setup stores profiles, rejecting invalid and duplicate dirs; got \(manualConfig.profiles)")
-check(manual.1.contains("doesn't look like") && manual.1.contains("Already added"), "manual setup explains rejected entries")
+check(manual.1.contains("doesn't look like"), "manual setup explains rejected entries")
+check(manual.1.contains("Return to finish"), "prompt tells the user how to finish")
 
 // detected flow keeps auto-detection (no profiles key) and records hidden/labels
 let detected = runScripted(["", "-", "Two!", "y"], detect: base)
 let detectedConfig = loadConfig(path: detected.2)
 check(detected.0 && detectedConfig.profiles.isEmpty && detectedConfig.hidden == ["Profile 1"] && detectedConfig.labels == ["Profile 2": "Two!"],
       "detected setup writes hidden/labels without pinning profiles")
+
+// re-running setup builds on existing profiles instead of replacing them
+let existingTwo = #"{ "profiles": [{ "dir": "Profile 3", "name": "Work" }, { "dir": "Default", "name": "Home" }] }"#
+let added = runScripted(["", "Profile 7", "School", "", "y"], detect: nil, existing: existingTwo)
+check(loadConfig(path: added.2).profiles.map(\.dir) == ["Profile 3", "Default", "Profile 7"], "setup adds to existing profiles by default")
+
+let renamed = runScripted(["", "Profile 3", "Work2", "", "y"], detect: nil, existing: existingTwo)
+check(loadConfig(path: renamed.2).profiles == [ConfiguredProfile(dir: "Profile 3", name: "Work2"), ConfiguredProfile(dir: "Default", name: "Home")],
+      "entering an existing directory renames it")
+
+let kept2 = runScripted(["", "Profile 3", "", "", "y"], detect: nil, existing: existingTwo)
+check(loadConfig(path: kept2.2).profiles.first?.name == "Work", "empty rename keeps the current name")
+
+let removed = runScripted(["", "-Default", "-Nope", "", "y"], detect: nil, existing: existingTwo)
+check(loadConfig(path: removed.2).profiles.map(\.dir) == ["Profile 3"] && removed.1.contains("Removed Default") && removed.1.contains("No profile \"Nope\""),
+      "-dir removes a profile and reports unknown ones")
+
+let startOver = runScripted(["n", "Profile 9", "", "", "y"], detect: nil, existing: existingTwo)
+check(loadConfig(path: startOver.2).profiles == [ConfiguredProfile(dir: "Profile 9", name: nil)], "answering n starts over")
+
+let removeAll = runScripted(["", "-Profile 3", "-Default", "", "y"], detect: nil, existing: existingTwo)
+check(!removeAll.0 && loadConfig(path: removeAll.2).profiles.count == 2, "removing everything writes nothing and keeps the old file")
 
 // declining writes nothing
 let declined = runScripted(["Profile 3", "", "", "n"], detect: nil)

@@ -55,7 +55,15 @@ You have two ways to fix that:
    ~/Applications/ProfilePicker.app/Contents/MacOS/ProfilePicker --setup
    ```
 
-   It asks for each profile's directory and the name to show, shows you the resulting file, and writes it only after you confirm. An existing config is backed up to `config.json.bak` and its other settings are kept. If Chrome's profile list is readable (Full Disk Access, below), setup instead lists the detected profiles and lets you rename or hide each one.
+   It asks for each profile's directory and the name to show, shows you the resulting file, and writes it only after you confirm. Press Return on an empty line to finish.
+
+   Running it again **builds on your existing profiles** rather than replacing them: it lists them and asks whether to keep them and add more (the default) or start over. While entering profiles:
+
+   - a new directory adds a profile
+   - an existing directory renames it
+   - `-<directory>` (for example `-Profile 3`) removes it
+
+   The old config is backed up to `config.json.bak` and its other settings are kept. If Chrome's profile list is readable (Full Disk Access, below), setup instead lists the detected profiles and lets you rename or hide each one.
 
    Or edit `~/.config/profile-picker/config.json` by hand:
 
