@@ -1,0 +1,136 @@
+# Profile Picker
+
+A tiny macOS app that asks **which Chrome profile** to open a link in. When you click a link in any app (Slack, Mail, Notes…), a small popup appears next to your cursor listing your Chrome profiles. Pick one by clicking it, pressing its number, or using the arrow keys and Return.
+
+- Lists your Chrome profiles, detected automatically or declared in a small config file
+- Popup appears at the cursor, kept on screen
+- Pre-selects the profile you used last, so Return repeats it
+- Native Swift/AppKit, no dependencies, no network access, no telemetry
+- Quits after every use, so nothing runs in the background
+
+## Requirements
+
+- macOS 12 or later
+- Xcode command-line tools (`xcode-select --install`) for `swiftc` and `codesign`
+- Google Chrome
+
+## Build and install
+
+```bash
+./build.sh
+```
+
+This builds the app, signs it ad hoc, and installs it to `~/Applications/ProfilePicker.app`.
+
+Then set it as your default browser: System Settings → Desktop & Dock → Default web browser → **Profile Picker**.
+
+If macOS blocks the first launch, run:
+
+```bash
+xattr -d com.apple.quarantine ~/Applications/ProfilePicker.app
+```
+
+## Usage
+
+Click a link in any app other than Chrome. The popup appears at the cursor:
+
+| Action | Key |
+|---|---|
+| Open in profile *n* (first nine) | `1`–`9` |
+| Move selection | `↑` / `↓` or hover |
+| Open selected | `Return` or click |
+| Dismiss | `Esc` or click elsewhere |
+
+Links clicked inside Chrome itself never go through the default browser, so they are not intercepted.
+
+## Profiles: detection and config
+
+The picker first tries to read your profiles from Chrome's `Local State` file. **Recent macOS versions block apps from reading other apps' data**, so on many Macs this fails. When it does, the popup shows only "Default" with an orange "Can't read Chrome profiles" note.
+
+You have two ways to fix that:
+
+1. **Declare your profiles** in `~/.config/profile-picker/config.json` (recommended, needs no special permission):
+
+   ```json
+   {
+     "profiles": [
+       { "dir": "Default",   "name": "Personal" },
+       { "dir": "Profile 3", "name": "Work" }
+     ]
+   }
+   ```
+
+   `dir` is Chrome's profile directory name. To find it, open `chrome://version` in that profile and read the last part of "Profile Path". When `profiles` is set, auto-detection is skipped.
+
+2. **Grant Full Disk Access** to `~/Applications/ProfilePicker.app` in System Settings → Privacy & Security → Full Disk Access. Profiles are then detected automatically, including new ones. This is a broad permission, so only do it if you're comfortable with that.
+
+## Configuration (optional)
+
+Besides `profiles`, the config file supports the keys below. Every key is optional:
+
+```json
+{
+  "hidden": ["Profile 5"],
+  "order": ["Profile 3", "Default"],
+  "labels": { "Profile 3": "Work" },
+  "rememberLast": true
+}
+```
+
+| Key | Meaning |
+|---|---|
+| `profiles` | Profiles declared by hand, replacing auto-detection |
+| `hidden` | Profiles to leave out of the popup |
+| `order` | Profiles to list first, in this order; the rest follow in Chrome's order |
+| `labels` | Override the display name of a profile |
+| `rememberLast` | Pre-select the last-used profile (default `true`) |
+
+Keys are Chrome profile directory names (`Default`, `Profile 1`, `Profile 2`, …). To see the list the picker would show:
+
+```bash
+~/Applications/ProfilePicker.app/Contents/MacOS/ProfilePicker --list-profiles
+```
+
+It prints `directory<TAB>name` for each profile the picker would show. An invalid config file is ignored and logged.
+
+## How it works
+
+The app registers for `http` and `https` links. Profiles come from the `profile.info_cache` section of Chrome's `Local State` file. On a link it shows the popup at the mouse position, then runs:
+
+```bash
+open -na "Google Chrome" --args --profile-directory="Profile 3" "<url>"
+```
+
+The `-n` flag is needed so Chrome receives `--profile-directory` even when it is already running.
+
+## Project layout
+
+```
+Sources/      app code (profile detection, config, launcher, popup UI)
+Resources/    Info.plist and the app icon
+Scripts/      icon generator
+Tests/        dependency-free tests, run with Tests/run.sh
+build.sh      build and install
+```
+
+## Tests
+
+```bash
+./Tests/run.sh
+```
+
+Covers profile parsing and ordering, config handling, last-used selection and the launch command.
+
+## Debugging
+
+Actions are logged to `~/Library/Logs/ProfilePicker.log`. URLs are not logged.
+
+## Known limitations
+
+- Chrome only; other Chromium browsers are not supported yet
+- Ad-hoc signed, so other Macs will need the `xattr` step above
+- Only the first nine profiles get number shortcuts
+
+## License
+
+MIT, see [LICENSE](LICENSE).
