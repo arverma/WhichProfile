@@ -29,17 +29,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let profiles = arrange(resolved.profiles, with: config)
         let last = UserDefaults.standard.string(forKey: lastProfileKey)
         let preselect = initialSelection(in: profiles, lastUsed: last, config: config)
+        let link = prepareLink(url, config: config)
 
-        picker = Picker(profiles: profiles) { chosen in
+        picker = Picker(profiles: profiles) { chosen, isPrivate in
             if let chosen = chosen {
                 UserDefaults.standard.set(chosen.dir, forKey: lastProfileKey)
-                launch(url, in: chosen)
+                launch(link.url, in: chosen, isPrivate: isPrivate)
             }
             // The app is single-shot: quit after every use so nothing lingers.
             NSApp.terminate(nil)
         }
         picker?.onSettings = { [weak self] in self?.openSettings() }
-        picker?.show(url: url, preselect: preselect, notice: resolved.warning)
+        picker?.show(url: link.url, cleaned: !link.removed.isEmpty, preselect: preselect, notice: resolved.warning)
     }
 
     private func openSettings() {
