@@ -9,4 +9,4 @@ trap 'rm -rf "$TMP"' EXIT
 swiftc -swift-version 5 \
     Sources/Model.swift Sources/ChromeProfiles.swift Sources/Config.swift Sources/Launcher.swift Sources/Setup.swift Sources/ProfileList.swift \
     Tests/main.swift -o "$TMP/tests"
-PROFILE_PICKER_LOG=/dev/null "$TMP/tests"
+WHICHPROFILE_LOG=/dev/null "$TMP/tests"

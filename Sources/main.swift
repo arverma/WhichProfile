@@ -61,25 +61,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+// Carry over a config saved under the app's old name (skipped when a test path is set).
+if ProcessInfo.processInfo.environment["WHICHPROFILE_CONFIG"] == nil { migrateLegacyConfig() }
+
 if CommandLine.arguments.contains("--help") || CommandLine.arguments.contains("-h") {
     print("""
-    Profile Picker: choose which Chrome profile opens a link.
+    WhichProfile: choose which Chrome profile opens a link.
 
-    Usage: ProfilePicker [option]
-      --setup           interactively create ~/.config/profile-picker/config.json
+    Usage: WhichProfile [option]
+      --setup           interactively create ~/.config/whichprofile/config.json
       --list-profiles   print the profiles the picker would show
       --help            show this help
     """)
     exit(0)
 }
 
-// `ProfilePicker --setup` walks through creating the config file.
+// `WhichProfile --setup` walks through creating the config file.
 if CommandLine.arguments.contains("--setup") {
     let io = SetupIO(read: { readLine() }, write: { print($0, terminator: ""); fflush(stdout) })
     exit(runSetup(io: io, detect: { loadChromeProfiles() }) ? 0 : 1)
 }
 
-// `ProfilePicker --list-profiles` prints the profiles the picker would show, for debugging.
+// `WhichProfile --list-profiles` prints the profiles the picker would show, for debugging.
 if CommandLine.arguments.contains("--list-profiles") {
     let config = loadConfig()
     let resolved = resolveProfiles(config: config, detect: { loadChromeProfiles() })

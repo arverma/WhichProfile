@@ -156,8 +156,8 @@ struct SettingsView: View {
             HStack(spacing: 8) {
                 Image(systemName: store.isDefault ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                     .foregroundColor(store.isDefault ? .green : .orange)
-                Text(store.isDefault ? "Profile Picker is your default browser."
-                               : "Profile Picker isn't your default browser yet, so links won't show the picker.")
+                Text(store.isDefault ? "WhichProfile is your default browser."
+                               : "WhichProfile isn't your default browser yet, so links won't show the picker.")
                     .font(.callout)
                 Spacer()
                 if !store.isDefault {
@@ -334,7 +334,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 560),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable],
                           backing: .buffered, defer: false)
-        window.title = "Profile Picker"
+        window.title = "WhichProfile"
         window.contentView = NSHostingView(rootView: SettingsView(store: store))
         window.isReleasedWhenClosed = false
         window.center()

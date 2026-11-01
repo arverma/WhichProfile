@@ -2,11 +2,11 @@ import Foundation
 
 // MARK: - Logging
 
-/// Appends a line to ~/Library/Logs/ProfilePicker.log, or to `$PROFILE_PICKER_LOG` if set
+/// Appends a line to ~/Library/Logs/WhichProfile.log, or to `$WHICHPROFILE_LOG` if set
 /// (the tests use this to keep their output out of the real log).
 func log(_ msg: String) {
-    let path = ProcessInfo.processInfo.environment["PROFILE_PICKER_LOG"]
-        ?? NSHomeDirectory() + "/Library/Logs/ProfilePicker.log"
+    let path = ProcessInfo.processInfo.environment["WHICHPROFILE_LOG"]
+        ?? NSHomeDirectory() + "/Library/Logs/WhichProfile.log"
     let line = "\(Date()) \(msg)\n"
     if let h = FileHandle(forWritingAtPath: path) {
         h.seekToEndOfFile()

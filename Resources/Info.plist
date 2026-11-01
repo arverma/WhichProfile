@@ -2,10 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key><string>Profile Picker</string>
-    <key>CFBundleDisplayName</key><string>Profile Picker</string>
-    <key>CFBundleIdentifier</key><string>local.profilepicker</string>
-    <key>CFBundleExecutable</key><string>ProfilePicker</string>
+    <key>CFBundleName</key><string>WhichProfile</string>
+    <key>CFBundleDisplayName</key><string>WhichProfile</string>
+    <key>CFBundleIdentifier</key><string>io.github.arverma.whichprofile</string>
+    <key>CFBundleExecutable</key><string>WhichProfile</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundleShortVersionString</key><string>1.0</string>

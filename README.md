@@ -1,4 +1,4 @@
-# Profile Picker
+# WhichProfile
 
 A tiny macOS app that asks **which Chrome profile** to open a link in. When you click a link in any app (Slack, Mail, Notes…), a small popup appears next to your cursor listing your Chrome profiles. Pick one by clicking it, pressing its number, or using the arrow keys and Return.
 
@@ -20,14 +20,14 @@ A tiny macOS app that asks **which Chrome profile** to open a link in. When you 
 ./build.sh
 ```
 
-This builds the app, signs it ad hoc, and installs it to `~/Applications/ProfilePicker.app`.
+This builds the app, signs it ad hoc, and installs it to `~/Applications/WhichProfile.app`.
 
-Then set it as your default browser: System Settings → Desktop & Dock → Default web browser → **Profile Picker**.
+Then set it as your default browser: System Settings → Desktop & Dock → Default web browser → **WhichProfile**.
 
 If macOS blocks the first launch, run:
 
 ```bash
-xattr -d com.apple.quarantine ~/Applications/ProfilePicker.app
+xattr -d com.apple.quarantine ~/Applications/WhichProfile.app
 ```
 
 ## Usage
@@ -46,13 +46,13 @@ Links clicked inside Chrome itself never go through the default browser, so they
 
 ## Settings window
 
-Open **Profile Picker** like any app (Spotlight, Finder, Launchpad), or choose **Edit profiles…** in the popup. There you can:
+Open **WhichProfile** like any app (Spotlight, Finder, Launchpad), or choose **Edit profiles…** in the popup. There you can:
 
 - **Rename** a profile by double-clicking its name (or the pencil next to it; Return saves, Esc cancels), **reorder** by dragging, and **remove** it with the trash icon at the end of its row (or the Delete key on a selected row). Removing asks for confirmation and cannot be undone, but a removed profile can be added back with Add Profile… or Detect from Chrome
 - **Add Profile…** by entering its directory (the dialog explains where to find it) and a name
 - **Detect from Chrome** to import your profiles automatically. If macOS blocks reading Chrome's data, you are asked to select Chrome's data folder (`~/Library/Application Support/Google/Chrome`), which grants access
 - Choose whether the **last used profile is pre-selected**
-- See whether Profile Picker is your **default browser** and fix it with one button
+- See whether WhichProfile is your **default browser** and fix it with one button
 
 Changes are saved automatically to the config file described below, so there is no Save button.
 
@@ -65,7 +65,7 @@ You have two ways to fix that:
 1. **Declare your profiles** (recommended, needs no special permission). The easy way is the interactive setup:
 
    ```bash
-   ~/Applications/ProfilePicker.app/Contents/MacOS/ProfilePicker --setup
+   ~/Applications/WhichProfile.app/Contents/MacOS/WhichProfile --setup
    ```
 
    It shows your profiles as a numbered list with a one-line menu:
@@ -76,7 +76,7 @@ You have two ways to fix that:
 
    Pick a letter, optionally followed by a number or directory (`d 2`, `a Profile 3`), or just press the letter and answer the question. Nothing is written until you press `s`, and `q` asks before discarding changes. The list starts from your saved profiles (or from Chrome's own list if it can be read), so running setup again edits what you have rather than starting over. The previous config is saved as `config.json.bak` and other settings are kept.
 
-   Or edit `~/.config/profile-picker/config.json` by hand:
+   Or edit `~/.config/whichprofile/config.json` by hand:
 
    ```json
    {
@@ -89,7 +89,7 @@ You have two ways to fix that:
 
    `dir` is Chrome's profile directory name. To find it, open `chrome://version` in that profile and read the last part of "Profile Path". When `profiles` is set, auto-detection is skipped.
 
-2. **Grant Full Disk Access** to `~/Applications/ProfilePicker.app` in System Settings → Privacy & Security → Full Disk Access. Profiles are then detected automatically, including new ones. This is a broad permission, so only do it if you're comfortable with that.
+2. **Grant Full Disk Access** to `~/Applications/WhichProfile.app` in System Settings → Privacy & Security → Full Disk Access. Profiles are then detected automatically, including new ones. This is a broad permission, so only do it if you're comfortable with that.
 
 ## Configuration (optional)
 
@@ -115,7 +115,7 @@ Besides `profiles`, the config file supports the keys below. Every key is option
 Keys are Chrome profile directory names (`Default`, `Profile 1`, `Profile 2`, …). To see the list the picker would show:
 
 ```bash
-~/Applications/ProfilePicker.app/Contents/MacOS/ProfilePicker --list-profiles
+~/Applications/WhichProfile.app/Contents/MacOS/WhichProfile --list-profiles
 ```
 
 It prints `directory<TAB>name` for each profile the picker would show. An invalid config file is ignored and logged.
@@ -151,21 +151,21 @@ Covers profile parsing, config handling, the editable profile list, `--setup` fl
 ## Command line
 
 ```
-ProfilePicker --setup           interactively create the config file
-ProfilePicker --list-profiles   print the profiles the picker would show
-ProfilePicker --help            show usage
+WhichProfile --setup           interactively create the config file
+WhichProfile --list-profiles   print the profiles the picker would show
+WhichProfile --help            show usage
 ```
 
 ## Debugging
 
-Actions are logged to `~/Library/Logs/ProfilePicker.log`. URLs are not logged.
+Actions are logged to `~/Library/Logs/WhichProfile.log`. URLs are not logged.
 
 Two environment variables help when developing or testing without touching your real files:
 
 | Variable | Effect |
 |---|---|
-| `PROFILE_PICKER_CONFIG` | Use this config file path instead of `~/.config/profile-picker/config.json` |
-| `PROFILE_PICKER_LOG` | Write the log here instead of `~/Library/Logs/ProfilePicker.log` |
+| `WHICHPROFILE_CONFIG` | Use this config file path instead of `~/.config/whichprofile/config.json` |
+| `WHICHPROFILE_LOG` | Write the log here instead of `~/Library/Logs/WhichProfile.log` |
 
 ## Known limitations
 

@@ -1,6 +1,6 @@
 import Foundation
 
-// `ProfilePicker --setup`: a small menu for editing your profile list without writing JSON.
+// `WhichProfile --setup`: a small menu for editing your profile list without writing JSON.
 
 /// Input/output seams so the whole flow can be driven by scripted input in tests.
 struct SetupIO {
@@ -61,7 +61,7 @@ func runSetup(io: SetupIO, detect: () -> [Profile]?, path: String = configPath) 
             let backedUp = try saveConfig(configByStoring(list, in: config), to: path, backup: true)
             io.write("\nSaved \(list.count) profile\(list.count == 1 ? "" : "s") to \(path)\n")
             if backedUp { io.write("Backup of the version before this save: \(path).bak\n(To undo this save, copy that file back over config.json.)\n") }
-            io.write("If you haven't yet, set Profile Picker as your default browser in\nSystem Settings → Desktop & Dock.\n")
+            io.write("If you haven't yet, set WhichProfile as your default browser in\nSystem Settings → Desktop & Dock.\n")
             return true
         } catch {
             io.write("Could not write the config: \(error.localizedDescription)\n")
@@ -70,7 +70,7 @@ func runSetup(io: SetupIO, detect: () -> [Profile]?, path: String = configPath) 
     }
 
     do {
-        io.write("Profile Picker setup\nChoose which Chrome profiles appear when you click a link.\n\n")
+        io.write("WhichProfile setup\nChoose which Chrome profiles appear when you click a link.\n\n")
         while true {
             showList()
             io.write("\n  [a] Add   [e] Rename   [d] Delete   [u] Move up   [s] Save   [q] Quit\n")

@@ -63,7 +63,7 @@ check(labelled.first(where: { $0.dir == "Profile 2" })?.name == "Two", "empty la
 
 // MARK: - loadConfig
 
-let tmp = NSTemporaryDirectory() + "profile-picker-test-\(UUID().uuidString).json"
+let tmp = NSTemporaryDirectory() + "whichprofile-test-\(UUID().uuidString).json"
 defer { try? FileManager.default.removeItem(atPath: tmp) }
 
 check(loadConfig(path: tmp) == Config(), "missing config file gives defaults")
@@ -238,6 +238,17 @@ let one = removalPrompt(for: ["Work"])
 check(one.title == "Remove “Work”?" && one.message.contains("add it back"), "single removal names the profile and says how to restore it")
 let many = removalPrompt(for: ["A", "B", "C"])
 check(many.title == "Remove 3 profiles?" && many.message.contains("add them back"), "multiple removal uses plural wording")
+
+// MARK: - legacy config migration
+
+let migDir = NSTemporaryDirectory() + "wp-mig-\(UUID().uuidString)"
+let legacyFile = migDir + "/old/config.json", newFile = migDir + "/new/config.json"
+try? FileManager.default.createDirectory(atPath: migDir + "/old", withIntermediateDirectories: true)
+try? #"{ "rememberLast": false }"#.write(toFile: legacyFile, atomically: true, encoding: .utf8)
+check(migrateLegacyConfig(to: newFile, from: legacyFile) && loadConfig(path: newFile).rememberLast == false, "legacy config is copied to the new location")
+try? #"{ "rememberLast": true }"#.write(toFile: newFile, atomically: true, encoding: .utf8)
+check(!migrateLegacyConfig(to: newFile, from: legacyFile) && loadConfig(path: newFile).rememberLast == true, "an existing new config is never overwritten")
+check(!migrateLegacyConfig(to: migDir + "/x/config.json", from: migDir + "/missing.json"), "nothing is copied when there is no legacy file")
 
 // MARK: - shared config helpers
 

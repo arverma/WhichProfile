@@ -1,6 +1,6 @@
 import Foundation
 
-/// Optional user configuration, read from `~/.config/profile-picker/config.json`.
+/// Optional user configuration, read from `~/.config/whichprofile/config.json`.
 /// Every field is optional; with no file at all the picker lists every Chrome profile.
 ///
 ///     {
@@ -51,9 +51,9 @@ struct Config: Codable, Equatable {
     }
 }
 
-/// `$PROFILE_PICKER_CONFIG` overrides the location (used for testing without touching your real config).
-let configPath = ProcessInfo.processInfo.environment["PROFILE_PICKER_CONFIG"]
-    ?? NSHomeDirectory() + "/.config/profile-picker/config.json"
+/// `$WHICHPROFILE_CONFIG` overrides the location (used for testing without touching your real config).
+let configPath = ProcessInfo.processInfo.environment["WHICHPROFILE_CONFIG"]
+    ?? NSHomeDirectory() + "/.config/whichprofile/config.json"
 
 func loadConfig(path: String = configPath) -> Config {
     guard let data = FileManager.default.contents(atPath: path) else { return Config() }
@@ -143,4 +143,22 @@ func saveConfig(_ config: Config, to path: String, backup: Bool) throws -> Bool 
     }
     try (json + Data("\n".utf8)).write(to: URL(fileURLWithPath: path), options: .atomic)
     return backedUp
+}
+
+/// Before the app was renamed, the config lived in ~/.config/profile-picker. Copies it to the
+/// new location once, if the new file doesn't exist yet. Returns true if a file was copied.
+@discardableResult
+func migrateLegacyConfig(to newPath: String = configPath,
+                         from legacyPath: String = NSHomeDirectory() + "/.config/profile-picker/config.json") -> Bool {
+    let fm = FileManager.default
+    guard !fm.fileExists(atPath: newPath), fm.fileExists(atPath: legacyPath) else { return false }
+    do {
+        try fm.createDirectory(atPath: (newPath as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+        try fm.copyItem(atPath: legacyPath, toPath: newPath)
+        log("migrated config from \(legacyPath) to \(newPath)")
+        return true
+    } catch {
+        log("could not migrate config: \(error.localizedDescription)")
+        return false
+    }
 }
