@@ -118,6 +118,10 @@ struct SettingsView: View {
                             }
                             Spacer()
                             Text(profile.dir).font(.caption).foregroundColor(.secondary)
+                            Button { remove(profile.id) } label: { icon("delete", fallback: "trash") }
+                                .buttonStyle(.borderless)
+                                .foregroundColor(.secondary)
+                                .help("Remove \(profile.name)")
                         }
                         .padding(.vertical, 3)
                     }
@@ -139,7 +143,6 @@ struct SettingsView: View {
                 Button("Add Profile…") { store.addModel.reset(); store.showingAdd = true }
                 Button("Detect from Chrome", action: detect)
                 Spacer()
-                Button("Remove", action: removeSelected).disabled(store.selection.isEmpty)
             }
 
             if let status = store.status {
@@ -177,10 +180,15 @@ struct SettingsView: View {
         }
     }
 
+    private func remove(_ id: String) {
+        store.list.remove(ids: [id])
+        store.selection.remove(id)
+        if store.editingID == id { store.editingID = nil }
+    }
+
+    /// Delete key on the selected rows.
     private func removeSelected() {
-        guard !store.selection.isEmpty else { return }
-        store.list.remove(ids: store.selection)
-        store.selection = []
+        for id in store.selection { remove(id) }
     }
 
     private func detect() {
