@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-01
+
 ### Added
 - Menu bar icon with a menu: Settings, default-browser status, Open at login, About and Quit.
 - **Open at login** option in General and in the menu bar menu (macOS 13 or later).
@@ -35,3 +37,7 @@ First release.
 - Menu bar while the settings window is open, including an Edit menu so copy and paste work.
 - `--setup`, `--list-profiles` and `--help` command-line options.
 - Automatic migration of a config saved under the app's earlier name.
+
+[Unreleased]: https://github.com/arverma/WhichProfile/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/arverma/WhichProfile/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/arverma/WhichProfile/releases/tag/v1.0.0
