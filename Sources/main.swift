@@ -4,12 +4,26 @@ private let lastProfileKey = "lastProfile"
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var picker: Picker?
+    private var settings: SettingsWindowController?
+    /// The link waiting for a choice, kept while the settings window is open so the popup can return.
+    private var pendingURL: URL?
     private var gotURL = false
 
     func application(_ application: NSApplication, open urls: [URL]) {
         guard let url = urls.first else { return }
         gotURL = true
+        showPicker(for: url)
+    }
 
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Launched by hand (no link): open the settings window.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [self] in
+            if !gotURL { openSettings() }
+        }
+    }
+
+    private func showPicker(for url: URL) {
+        pendingURL = url
         let config = loadConfig()
         let resolved = resolveProfiles(config: config, detect: { loadChromeProfiles() })
         let profiles = arrange(resolved.profiles, with: config)
@@ -24,19 +38,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // The app is single-shot: quit after every use so nothing lingers.
             NSApp.terminate(nil)
         }
+        picker?.onSettings = { [weak self] in self?.openSettings() }
         picker?.show(url: url, preselect: preselect, notice: resolved.warning)
     }
 
-    func applicationDidFinishLaunching(_ notification: Notification) {
-        // Launched by hand (no link): explain, then quit so nothing lingers.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [self] in
-            guard !gotURL else { return }
-            NSApp.setActivationPolicy(.regular)
-            NSApp.activate(ignoringOtherApps: true)
-            let alert = NSAlert()
-            alert.messageText = "Profile Picker is installed"
-            alert.informativeText = "Set it as your default web browser in System Settings → Desktop & Dock. After that, clicking any link shows a profile chooser next to the cursor."
-            alert.runModal()
+    private func openSettings() {
+        picker = nil
+        let controller = SettingsWindowController(onClose: { [weak self] in self?.settingsClosed() })
+        settings = controller
+        controller.show()
+    }
+
+    private func settingsClosed() {
+        settings = nil
+        if let url = pendingURL {
+            // Back to the link that was waiting, now with the edited profile list.
+            NSApp.setActivationPolicy(.accessory)
+            showPicker(for: url)
+        } else {
             NSApp.terminate(nil)
         }
     }

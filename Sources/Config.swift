@@ -72,7 +72,7 @@ func resolveProfiles(config: Config, detect: () -> [Profile]?) -> (profiles: [Pr
         return (config.profiles.map { Profile(dir: $0.dir, name: $0.name ?? $0.dir) }, nil)
     }
     if let detected = detect() { return (detected, nil) }
-    return ([Profile(dir: "Default", name: "Default")], "Can't read Chrome profiles. See README.")
+    return ([Profile(dir: "Default", name: "Default")], "Add your profiles with Edit profiles…")
 }
 
 /// Applies hiding, relabelling and ordering. Never returns an empty list:
@@ -98,4 +98,49 @@ func initialSelection(in profiles: [Profile], lastUsed: String?, config: Config)
     guard config.rememberLast, let last = lastUsed,
           let i = profiles.firstIndex(where: { $0.dir == last }) else { return 0 }
     return i
+}
+
+// MARK: - Saving and editing helpers shared by `--setup` and the settings window
+
+func encodeConfig(_ config: Config) throws -> Data {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+    return try encoder.encode(config)
+}
+
+/// The profile list to start editing from: saved profiles if any, else Chrome's own list if it
+/// can be read, else empty. `hidden`, `labels` and `order` are folded in, because once a list is
+/// saved it is the single source of truth. `fromChrome` is true when the list isn't saved yet.
+func initialProfileList(config: Config, detect: () -> [Profile]?) -> (list: [Profile], fromChrome: Bool) {
+    if !config.profiles.isEmpty {
+        let saved = config.profiles.map { Profile(dir: $0.dir, name: $0.name ?? $0.dir) }
+        return (arrange(saved, with: config), false)
+    }
+    if let detected = detect() { return (arrange(detected, with: config), true) }
+    return ([], false)
+}
+
+/// Returns `config` with `list` stored as its profiles (empty names fall back to the directory).
+func configByStoring(_ list: [Profile], in config: Config) -> Config {
+    var result = config
+    result.profiles = list.map { ConfiguredProfile(dir: $0.dir, name: $0.name.isEmpty ? $0.dir : $0.name) }
+    result.hidden = []; result.labels = [:]; result.order = []   // already part of the list
+    return result
+}
+
+/// Writes the config (pretty JSON plus a trailing newline). With `backup`, the previous file is
+/// first copied to `<path>.bak`. Returns true if a backup was made.
+@discardableResult
+func saveConfig(_ config: Config, to path: String, backup: Bool) throws -> Bool {
+    let json = try encodeConfig(config)
+    let fm = FileManager.default
+    try fm.createDirectory(atPath: (path as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+    var backedUp = false
+    if backup && fm.fileExists(atPath: path) {
+        try? fm.removeItem(atPath: path + ".bak")
+        try fm.copyItem(atPath: path, toPath: path + ".bak")
+        backedUp = true
+    }
+    try (json + Data("\n".utf8)).write(to: URL(fileURLWithPath: path), options: .atomic)
+    return backedUp
 }

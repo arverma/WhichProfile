@@ -13,12 +13,6 @@ func isValidProfileDir(_ dir: String) -> Bool {
     !dir.isEmpty && dir.count <= 64 && !dir.contains("/") && !dir.contains("..") && !dir.hasPrefix("-")
 }
 
-func encodeConfig(_ config: Config) throws -> Data {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-    return try encoder.encode(config)
-}
-
 /// Raised when input ends (Ctrl-D or a closed pipe) so the flow can stop without writing anything.
 private struct InputEnded: Error {}
 
@@ -35,18 +29,10 @@ func runSetup(io: SetupIO, detect: () -> [Profile]?, path: String = configPath) 
         return line.trimmingCharacters(in: .whitespaces)
     }
 
-    var config = loadConfig(path: path)
-    var list: [Profile]
-    var dirty = false
-
-    if !config.profiles.isEmpty {
-        list = arrange(config.profiles.map { Profile(dir: $0.dir, name: $0.name ?? $0.dir) }, with: config)
-    } else if let detected = detect() {
-        list = arrange(detected, with: config)
-        dirty = true   // found in Chrome but not saved yet
-    } else {
-        list = []
-    }
+    let config = loadConfig(path: path)
+    let seed = initialProfileList(config: config, detect: detect)
+    var list = seed.list
+    var dirty = seed.fromChrome   // found in Chrome but not saved yet
 
     func showList() {
         if list.isEmpty {
@@ -71,22 +57,8 @@ func runSetup(io: SetupIO, detect: () -> [Profile]?, path: String = configPath) 
     }
 
     func save() -> Bool {
-        config.profiles = list.map { ConfiguredProfile(dir: $0.dir, name: $0.name) }
-        config.hidden = []; config.labels = [:]; config.order = []   // now part of the list itself
-        guard let json = try? encodeConfig(config) else {
-            io.write("Could not encode the configuration.\n")
-            return false
-        }
-        let fm = FileManager.default
         do {
-            try fm.createDirectory(atPath: (path as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
-            var backedUp = false
-            if fm.fileExists(atPath: path) {
-                try? fm.removeItem(atPath: path + ".bak")
-                try fm.copyItem(atPath: path, toPath: path + ".bak")
-                backedUp = true
-            }
-            try (json + Data("\n".utf8)).write(to: URL(fileURLWithPath: path), options: .atomic)
+            let backedUp = try saveConfig(configByStoring(list, in: config), to: path, backup: true)
             io.write("\nSaved \(list.count) profile\(list.count == 1 ? "" : "s") to \(path)\n")
             if backedUp { io.write("Backup of the version before this save: \(path).bak\n(To undo this save, copy that file back over config.json.)\n") }
             io.write("If you haven't yet, set Profile Picker as your default browser in\nSystem Settings → Desktop & Dock.\n")

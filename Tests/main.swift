@@ -202,4 +202,56 @@ check(FileManager.default.fileExists(atPath: baked.2 + ".bak"), "previous config
 let encoded = String(data: try! encodeConfig(Config()), encoding: .utf8)!
 check(!encoded.contains("hidden") && !encoded.contains("rememberLast"), "default values are omitted from generated JSON")
 
+// MARK: - ProfileList (settings window model)
+
+var pl = ProfileList(items: [profile("Default", "Home"), profile("Profile 3", "Work")])
+
+do { try pl.add(dir: " Profile 7 ", name: "  School "); check(pl.items.last == profile("Profile 7", "School"), "add trims and names the profile") }
+catch { check(false, "add should succeed: \(error)") }
+do { try pl.add(dir: "Profile 8", name: ""); check(pl.items.last == profile("Profile 8"), "empty name falls back to the directory") }
+catch { check(false, "add with empty name should succeed") }
+
+let before = pl
+do { try pl.add(dir: "Profile 3", name: "x"); check(false, "duplicate should throw") }
+catch { check(error as? ProfileListError == .duplicate(existingName: "Work"), "duplicate error names the existing profile") }
+do { try pl.add(dir: "../x", name: ""); check(false, "invalid should throw") }
+catch { check(error as? ProfileListError == .invalidDirectory, "invalid directory is rejected") }
+check(pl == before, "failed adds leave the list unchanged")
+
+check(pl.merge([profile("Default", "Renamed elsewhere"), profile("Profile 9", "New")]) == 1
+      && pl.items.first(where: { $0.dir == "Default" })?.name == "Home"
+      && pl.items.last == profile("Profile 9", "New"),
+      "merge adds only new profiles and never overwrites names")
+
+pl.remove(ids: ["Profile 3", "Nope"])
+check(pl.items.map(\.dir) == ["Default", "Profile 7", "Profile 8", "Profile 9"], "remove deletes by id and ignores unknown ids")
+
+var mv = ProfileList(items: ["a", "b", "c", "d"].map { profile($0) })
+mv.move(from: IndexSet(integer: 0), to: 3)
+check(mv.items.map(\.dir) == ["b", "c", "a", "d"], "move forward follows SwiftUI onMove semantics; got \(mv.items.map(\.dir))")
+mv.move(from: IndexSet(integer: 3), to: 0)
+check(mv.items.map(\.dir) == ["d", "b", "c", "a"], "move to the front")
+mv.move(from: IndexSet([0, 1]), to: 4)
+check(mv.items.map(\.dir) == ["c", "a", "d", "b"], "moving several items keeps their order; got \(mv.items.map(\.dir))")
+
+// MARK: - shared config helpers
+
+let storedConfig = configByStoring([profile("A", "Alpha"), profile("B", "")],
+                                   in: { var c = Config(); c.hidden = ["Z"]; c.labels = ["A": "x"]; c.order = ["B"]; c.rememberLast = false; return c }())
+check(storedConfig.profiles == [cp("A", "Alpha"), cp("B", "B")], "stored profiles use the directory for empty names")
+check(storedConfig.hidden.isEmpty && storedConfig.labels.isEmpty && storedConfig.order.isEmpty && !storedConfig.rememberLast,
+      "storing a list folds in hidden/labels/order and keeps other settings")
+
+let seedSaved = initialProfileList(config: { var c = Config(); c.profiles = [cp("A", "Alpha")]; return c }(), detect: { base })
+check(seedSaved.list == [profile("A", "Alpha")] && !seedSaved.fromChrome, "saved profiles win over detection")
+let seedDetected = initialProfileList(config: Config(), detect: { base })
+check(seedDetected.list == base && seedDetected.fromChrome, "detected profiles seed the list when nothing is saved")
+check(initialProfileList(config: Config(), detect: { nil }).list.isEmpty, "empty when nothing saved or detected")
+
+let savePath = NSTemporaryDirectory() + "pp-save-\(UUID().uuidString)/config.json"
+check(try saveConfig(Config(), to: savePath, backup: true) == false, "first save makes no backup")
+check(try saveConfig(Config(), to: savePath, backup: false) == false && !FileManager.default.fileExists(atPath: savePath + ".bak"), "backup:false never backs up")
+check(try saveConfig(Config(), to: savePath, backup: true) == true && FileManager.default.fileExists(atPath: savePath + ".bak"), "backup:true copies the previous file")
+check(String(data: FileManager.default.contents(atPath: savePath)!, encoding: .utf8)!.hasSuffix("\n"), "saved file ends with a newline")
+
 if failures == 0 { print("All tests passed") } else { print("\(failures) test(s) failed"); exit(1) }

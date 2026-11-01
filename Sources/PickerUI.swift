@@ -45,6 +45,37 @@ final class RowView: NSView {
     }
 }
 
+// MARK: - Footer
+
+/// "Edit profiles…" row at the bottom of the popup.
+final class FooterView: NSView {
+    var onPick: (() -> Void)?
+    private var hovering = false { didSet { needsDisplay = true } }
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                                       owner: self, userInfo: nil))
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override func mouseEntered(with event: NSEvent) { hovering = true }
+    override func mouseExited(with event: NSEvent) { hovering = false }
+    override func mouseDown(with event: NSEvent) { onPick?() }
+
+    override func draw(_ dirtyRect: NSRect) {
+        if hovering {
+            NSColor.labelColor.withAlphaComponent(0.08).setFill()
+            NSBezierPath(roundedRect: bounds.insetBy(dx: 5, dy: 2), xRadius: 6, yRadius: 6).fill()
+        }
+        let font = NSFont.systemFont(ofSize: 12)
+        let y = (bounds.height - font.boundingRectForFont.height) / 2
+        NSAttributedString(string: "Edit profiles…", attributes: [.font: font, .foregroundColor: NSColor.secondaryLabelColor])
+            .draw(at: NSPoint(x: 16, y: y))
+    }
+}
+
 // MARK: - Panel
 
 final class PickerPanel: NSPanel {
@@ -63,6 +94,9 @@ final class Picker {
     private var selected = 0
     private var clickMonitor: Any?
 
+    /// Called when the user chooses "Edit profiles…"; the popup closes first.
+    var onSettings: (() -> Void)?
+
     /// `onFinish` is called once with the chosen profile, or nil if dismissed.
     init(profiles: [Profile], onFinish: @escaping (Profile?) -> Void) {
         self.profiles = profiles
@@ -77,7 +111,8 @@ final class Picker {
         let headerH: CGFloat = 26
         let pad: CGFloat = 6
         let noticeH: CGFloat = notice == nil ? 0 : 22
-        let height = headerH + CGFloat(profiles.count) * rowH + pad + noticeH
+        let footerH: CGFloat = 28
+        let height = headerH + CGFloat(profiles.count) * rowH + pad + noticeH + footerH
 
         let effect = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: width, height: height))
         effect.material = .menu
@@ -110,9 +145,16 @@ final class Picker {
             label.font = .systemFont(ofSize: 10)
             label.textColor = .systemOrange
             label.lineBreakMode = .byTruncatingTail
-            label.frame = NSRect(x: 16, y: 6, width: width - 32, height: 14)
+            label.frame = NSRect(x: 16, y: footerH + 4, width: width - 32, height: 14)
             effect.addSubview(label)
         }
+
+        let separator = NSBox(frame: NSRect(x: 12, y: footerH, width: width - 24, height: 1))
+        separator.boxType = .separator
+        effect.addSubview(separator)
+        let footer = FooterView(frame: NSRect(x: 0, y: 0, width: width, height: footerH))
+        footer.onPick = { [weak self] in self?.openSettings() }
+        effect.addSubview(footer)
 
         // Place the panel next to the cursor (where the link was just clicked), kept on screen.
         let mouse = NSEvent.mouseLocation
@@ -154,6 +196,7 @@ final class Picker {
         switch e.keyCode {
         case 53: finish(nil)                                              // esc
         case 36, 76: pick(selected)                                       // return / enter
+        case 43: openSettings()                                           // comma
         case 125: select((selected + 1) % rows.count)                     // down
         case 126: select((selected - 1 + rows.count) % rows.count)        // up
         default:
@@ -164,6 +207,11 @@ final class Picker {
     }
 
     private func pick(_ i: Int) { finish(profiles[i]) }
+
+    private func openSettings() {
+        close()
+        onSettings?()
+    }
 
     private func finish(_ profile: Profile?) {
         close()

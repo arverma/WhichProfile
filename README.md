@@ -11,7 +11,7 @@ A tiny macOS app that asks **which Chrome profile** to open a link in. When you 
 ## Requirements
 
 - macOS 12 or later
-- Xcode command-line tools (`xcode-select --install`) for `swiftc` and `codesign`
+- Xcode command-line tools (`xcode-select --install`) for `swiftc` and `codesign`; full Xcode is not needed
 - Google Chrome
 
 ## Build and install
@@ -39,9 +39,22 @@ Click a link in any app other than Chrome. The popup appears at the cursor:
 | Open in profile *n* (first nine) | `1`–`9` |
 | Move selection | `↑` / `↓` or hover |
 | Open selected | `Return` or click |
+| Edit your profiles | click **Edit profiles…** or press `,` |
 | Dismiss | `Esc` or click elsewhere |
 
 Links clicked inside Chrome itself never go through the default browser, so they are not intercepted.
+
+## Settings window
+
+Open **Profile Picker** like any app (Spotlight, Finder, Launchpad), or choose **Edit profiles…** in the popup. There you can:
+
+- **Rename** a profile by clicking its name, **reorder** by dragging, and **remove** it with the Remove button or the Delete key
+- **Add Profile…** by entering its directory (the dialog explains where to find it) and a name
+- **Detect from Chrome** to import your profiles automatically. If macOS blocks reading Chrome's data, you are asked to select Chrome's data folder (`~/Library/Application Support/Google/Chrome`), which grants access
+- Choose whether the **last used profile is pre-selected**
+- See whether Profile Picker is your **default browser** and fix it with one button
+
+Changes are saved automatically to the config file described below, so there is no Save button.
 
 ## Profiles: detection and config
 
@@ -120,7 +133,7 @@ The `-n` flag is needed so Chrome receives `--profile-directory` even when it is
 ## Project layout
 
 ```
-Sources/      app code (profile detection, config, launcher, popup UI)
+Sources/      app code (profile list and config, launcher, popup, settings window, --setup)
 Resources/    Info.plist and the app icon
 Scripts/      icon generator
 Tests/        dependency-free tests, run with Tests/run.sh
@@ -133,7 +146,7 @@ build.sh      build and install
 ./Tests/run.sh
 ```
 
-Covers profile parsing and ordering, config handling, last-used selection and the launch command.
+Covers profile parsing, config handling, the editable profile list, `--setup` flows, last-used selection and the launch command. The UI itself (popup and settings window) is not covered by automated tests.
 
 ## Command line
 
