@@ -10,6 +10,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 swiftc -O -swift-version 5 Sources/*.swift -o "$APP/Contents/MacOS/ProfilePicker"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+cp -R Resources/icons "$APP/Contents/Resources/icons"
 codesign --force --sign - "$APP"
 
 mkdir -p "$HOME/Applications"

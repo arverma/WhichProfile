@@ -134,7 +134,7 @@ The `-n` flag is needed so Chrome receives `--profile-directory` even when it is
 
 ```
 Sources/      app code (profile list and config, launcher, popup, settings window, --setup)
-Resources/    Info.plist and the app icon
+Resources/    Info.plist, the app icon and the settings window icons (icons/)
 Scripts/      icon generator
 Tests/        dependency-free tests, run with Tests/run.sh
 build.sh      build and install

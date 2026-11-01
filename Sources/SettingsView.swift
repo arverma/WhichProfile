@@ -71,6 +71,20 @@ private func profilesFromChosenFolder() -> [Profile]? {
     return profiles.isEmpty ? nil : profiles
 }
 
+// MARK: - Icons
+
+/// A bundled icon drawn as a template image, so it follows light/dark mode. Falls back to an SF
+/// Symbol if the file is missing (for example when running outside the app bundle).
+private func icon(_ name: String, fallback: String) -> Image {
+    if let url = Bundle.main.url(forResource: name, withExtension: "png", subdirectory: "icons"),
+       let image = NSImage(contentsOf: url) {
+        image.size = NSSize(width: 15, height: 15)
+        image.isTemplate = true
+        return Image(nsImage: image).renderingMode(.template)
+    }
+    return Image(systemName: fallback)
+}
+
 // MARK: - Views
 
 struct SettingsView: View {
@@ -87,14 +101,17 @@ struct SettingsView: View {
             ZStack {
                 List(selection: $store.selection) {
                     ForEach($store.list.items) { $profile in
-                        HStack(spacing: 6) {
+                        HStack(spacing: 8) {
+                            icon("drag", fallback: "line.3.horizontal")
+                                .foregroundColor(.secondary)
+                                .help("Drag to reorder")
                             if store.editingID == profile.id {
                                 RenameField(text: $profile.name) { store.editingID = nil }
                             } else {
                                 Text(profile.name)
                                     .help("Double-click to rename")
                                     .simultaneousGesture(TapGesture(count: 2).onEnded { store.editingID = profile.id })
-                                Button { store.editingID = profile.id } label: { Image(systemName: "pencil") }
+                                Button { store.editingID = profile.id } label: { icon("edit", fallback: "pencil") }
                                     .buttonStyle(.borderless)
                                     .foregroundColor(.secondary)
                                     .help("Rename")
