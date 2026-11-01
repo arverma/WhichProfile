@@ -15,72 +15,115 @@ func icon(_ name: String, fallback: String) -> Image {
     return Image(systemName: fallback)
 }
 
+// MARK: - Avatar
+
+private let avatarPalette: [Color] = [
+    Color(nsColor: .systemBlue), Color(nsColor: .systemGreen), Color(nsColor: .systemOrange), Color(nsColor: .systemPurple),
+    Color(nsColor: .systemPink), Color(nsColor: .systemTeal), Color(nsColor: .systemIndigo), Color(nsColor: .systemRed),
+]
+
+/// A round, coloured badge with the profile's initial, like Chrome's own profile avatars.
+private struct ProfileAvatar: View {
+    let name: String
+    let seed: String
+
+    var body: some View {
+        ZStack {
+            Circle().fill(avatarPalette[avatarPaletteIndex(for: seed, count: avatarPalette.count)])
+            Text(profileInitial(name))
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white)
+        }
+        .frame(width: 32, height: 32)
+        .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Transparent list background
+
+/// SwiftUI's List draws an opaque white background on the macOS versions this app supports, which
+/// clashes with the grey cards used on the other tabs. This clears it so the card shows through.
+private struct ClearListBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { NSView() }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        // The list's views may not exist yet on the first pass, so try a few times.
+        for delay in [0.0, 0.15, 0.5] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { clear(from: view) }
+        }
+    }
+
+    private func clear(from view: NSView) {
+        var ancestor: NSView? = view.superview
+        while let current = ancestor {
+            if let scrollView = firstScrollView(in: current) {
+                scrollView.drawsBackground = false
+                scrollView.backgroundColor = .clear
+                scrollView.contentView.drawsBackground = false
+                scrollView.wantsLayer = true
+                scrollView.layer?.backgroundColor = NSColor.clear.cgColor
+                if let table = scrollView.documentView as? NSTableView {
+                    table.backgroundColor = .clear
+                    table.usesAlternatingRowBackgroundColors = false
+                }
+                return
+            }
+            ancestor = current.superview
+        }
+    }
+
+    private func firstScrollView(in root: NSView) -> NSScrollView? {
+        if let scroll = root as? NSScrollView { return scroll }
+        for child in root.subviews { if let found = firstScrollView(in: child) { return found } }
+        return nil
+    }
+}
+
 // MARK: - Tab
 
 struct ProfilesTab: View {
     @ObservedObject var store: SettingsStore
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Chrome profiles").font(.headline)
-                Text("These appear when you click a link. Double-click a name (or click the pencil) to rename it. Drag a row to change the order.")
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Text("Chrome profiles").font(.headline)
+                    Spacer()
+                    Button("Detect from Chrome", action: detect)
+                    Button("Add Profile…") { addProfile() }
+                        .buttonStyle(.borderedProminent)
+                }
+                Text("These appear when you click a link, in this order. Double-click a name (or click the pencil) to rename it, and drag a row to reorder.")
                     .font(.callout).foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            ZStack {
-                List(selection: $store.selection) {
-                    ForEach($store.list.items) { $profile in
-                        HStack(spacing: 8) {
-                            icon("drag", fallback: "line.3.horizontal")
-                                .foregroundColor(.secondary)
-                                .help("Drag to reorder")
-                            if store.editingID == profile.id {
-                                RenameField(text: $profile.name) { store.editingID = nil }
-                            } else {
-                                Text(profile.name)
-                                    .help("Double-click to rename")
-                                    .simultaneousGesture(TapGesture(count: 2).onEnded { store.editingID = profile.id })
-                                Button { store.editingID = profile.id } label: { icon("edit", fallback: "pencil") }
-                                    .buttonStyle(.borderless)
-                                    .foregroundColor(.secondary)
-                                    .help("Rename")
-                                    .accessibilityLabel("Rename \(profile.name)")
-                            }
-                            Spacer()
-                            Text(profile.dir).font(.caption).foregroundColor(.secondary)
-                            Button { confirmRemoval(of: [profile.id]) } label: { icon("delete", fallback: "trash") }
-                                .buttonStyle(.borderless)
-                                .foregroundColor(.secondary)
-                                .help("Remove \(profile.name)")
-                                .accessibilityLabel("Remove \(profile.name)")
+            GroupBox {
+                ZStack {
+                    List(selection: $store.selection) {
+                        ForEach($store.list.items) { $profile in
+                            row($profile)
                         }
-                        .padding(.vertical, 3)
+                        .onMove { store.list.move(from: $0, to: $1) }
                     }
-                    .onMove { store.list.move(from: $0, to: $1) }
-                }
-                .onDeleteCommand(perform: removeSelected)
+                    .listStyle(.plain)
+                    .background(ClearListBackground())
+                    .onDeleteCommand(perform: removeSelected)
 
-                if store.list.items.isEmpty {
-                    Text("No profiles yet.\nClick “Detect from Chrome” or “Add Profile…”.")
-                        .multilineTextAlignment(.center)
-                        .foregroundColor(.secondary)
-                        .allowsHitTesting(false)
+                    if store.list.items.isEmpty { emptyState }
                 }
+                .frame(minHeight: 240, maxHeight: .infinity)
             }
-            .frame(minHeight: 200)
-            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.25)))
-
-            HStack {
-                Button("Add Profile…") { store.addModel.reset(); store.showingAdd = true }
-                Button("Detect from Chrome", action: detect)
-                Spacer()
-            }
+            .frame(maxHeight: .infinity)
 
             if let status = store.status {
                 Text(status).font(.callout).foregroundColor(.secondary)
             }
+
+            let count = store.list.items.count
+            Text(count == 0 ? "" : "\(count) profile\(count == 1 ? "" : "s"). In the picker, press 1–9 to choose one quickly.")
+                .font(.footnote).foregroundColor(.secondary)
         }
         .padding(20)
         .sheet(isPresented: $store.showingAdd) {
@@ -89,6 +132,76 @@ struct ProfilesTab: View {
                 catch { return (error as? ProfileListError)?.message ?? "Couldn't add that profile." }
             }
         }
+    }
+
+    // MARK: Rows
+
+    private func row(_ profile: Binding<Profile>) -> some View {
+        let item = profile.wrappedValue
+        let position = store.list.items.firstIndex(where: { $0.id == item.id }).map { $0 + 1 }
+        return HStack(spacing: 12) {
+            icon("drag", fallback: "line.3.horizontal")
+                .foregroundColor(.secondary)
+                .help("Drag to reorder")
+
+            ProfileAvatar(name: item.name, seed: item.dir)
+
+            VStack(alignment: .leading, spacing: 1) {
+                if store.editingID == item.id {
+                    RenameField(text: profile.name) { store.editingID = nil }
+                        .frame(maxWidth: 220)
+                } else {
+                    HStack(spacing: 6) {
+                        Text(item.name)
+                            .fontWeight(.medium)
+                            .help("Double-click to rename")
+                            .simultaneousGesture(TapGesture(count: 2).onEnded { store.editingID = item.id })
+                        Button { store.editingID = item.id } label: { icon("edit", fallback: "pencil") }
+                            .buttonStyle(.borderless)
+                            .foregroundColor(.secondary)
+                            .help("Rename")
+                            .accessibilityLabel("Rename \(item.name)")
+                    }
+                }
+                Text(item.dir).font(.caption).foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            if let position = position, position <= 9 {
+                Text("\(position)")
+                    .font(.system(.callout, design: .monospaced))
+                    .foregroundColor(.secondary)
+                    .frame(width: 24, height: 22)
+                    .background(Color.secondary.opacity(0.15))
+                    .cornerRadius(5)
+                    .help("Press \(position) in the picker to open this profile")
+                    .accessibilityLabel("Shortcut \(position)")
+            }
+
+            Button { confirmRemoval(of: [item.id]) } label: { icon("delete", fallback: "trash") }
+                .buttonStyle(.borderless)
+                .foregroundColor(.secondary)
+                .help("Remove \(item.name)")
+                .accessibilityLabel("Remove \(item.name)")
+        }
+        .padding(.vertical, 6)
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "person.crop.circle.badge.plus")
+                .font(.system(size: 38))
+                .foregroundColor(.secondary)
+            Text("No profiles yet").font(.headline)
+            Text("Click “Detect from Chrome” or “Add Profile…” above to get started.")
+                .font(.callout).foregroundColor(.secondary)
+        }
+    }
+
+    private func addProfile() {
+        store.addModel.reset()
+        store.showingAdd = true
     }
 
     /// Asks before removing, since there is no undo. Cancel is the default button so that

@@ -12,6 +12,7 @@ All notable changes to this project are documented here. The format follows
 - `--background` option to start in the menu bar without opening the settings window.
 
 ### Changed
+- Redesigned the Profiles tab to match the other tabs: card layout, coloured profile avatars, a shortcut-number badge on each row, a clearer header and empty state.
 - WhichProfile now stays running in the menu bar instead of quitting after each link, and has no Dock icon.
 - Opening the app again from Spotlight or Finder shows the settings window. A start caused by a link or by login stays quiet.
 - `build.sh` stops the running copy and restarts the new one quietly.

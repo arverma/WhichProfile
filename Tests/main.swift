@@ -316,6 +316,15 @@ check(!shouldShowSettingsOnLaunch(receivedLink: true, loginLaunch: false, backgr
 check(!shouldShowSettingsOnLaunch(receivedLink: false, loginLaunch: true, backgroundFlag: false), "a login launch stays quiet")
 check(!shouldShowSettingsOnLaunch(receivedLink: false, loginLaunch: false, backgroundFlag: true), "--background stays quiet")
 
+// MARK: - avatars
+
+check(profileInitial("work") == "W" && profileInitial("  quillbot") == "Q" && profileInitial("9 to 5") == "9", "avatar initial is the first letter or digit, uppercased")
+check(profileInitial("") == "?" && profileInitial("…") == "?", "avatar initial falls back to a question mark")
+check(avatarPaletteIndex(for: "Profile 3", count: 8) == avatarPaletteIndex(for: "Profile 3", count: 8), "avatar colour is stable")
+check((0..<20).allSatisfy { (0..<8).contains(avatarPaletteIndex(for: "Profile \($0)", count: 8)) }, "avatar colour index stays inside the palette")
+check(Set((0..<20).map { avatarPaletteIndex(for: "Profile \($0)", count: 8) }).count >= 4, "different profiles get a spread of colours")
+check(avatarPaletteIndex(for: "x", count: 0) == 0, "an empty palette does not crash")
+
 // MARK: - shared config helpers
 
 let storedConfig = configByStoring([profile("A", "Alpha"), profile("B", "")],

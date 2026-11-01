@@ -67,3 +67,19 @@ func removalPrompt(for names: [String]) -> (title: String, message: String) {
     return ("Remove \(names.count) profiles?",
             "They will no longer appear when you click a link. You can add them back later with Add Profile… or Detect from Chrome.")
 }
+
+// MARK: - Avatars
+
+/// The letter shown in a profile's avatar: its first letter or digit, uppercased, else "?".
+func profileInitial(_ name: String) -> String {
+    guard let first = name.first(where: { $0.isLetter || $0.isNumber }) else { return "?" }
+    return String(first).uppercased()
+}
+
+/// A stable index into an avatar colour palette, derived from `seed` (a profile's directory).
+/// Swift's own `hashValue` changes between launches, so this sums the characters instead:
+/// a profile keeps the same colour every time.
+func avatarPaletteIndex(for seed: String, count: Int) -> Int {
+    guard count > 0 else { return 0 }
+    return seed.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) % 1_000_003 } % count
+}
