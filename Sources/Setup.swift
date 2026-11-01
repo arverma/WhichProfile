@@ -88,7 +88,7 @@ func runSetup(io: SetupIO, detect: () -> [Profile]?, path: String = configPath) 
             }
             try (json + Data("\n".utf8)).write(to: URL(fileURLWithPath: path), options: .atomic)
             io.write("\nSaved \(list.count) profile\(list.count == 1 ? "" : "s") to \(path)\n")
-            if backedUp { io.write("Your previous settings are in \(path).bak\n") }
+            if backedUp { io.write("Backup of the version before this save: \(path).bak\n(To undo this save, copy that file back over config.json.)\n") }
             io.write("If you haven't yet, set Profile Picker as your default browser in\nSystem Settings → Desktop & Dock.\n")
             return true
         } catch {
