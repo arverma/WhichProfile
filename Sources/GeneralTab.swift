@@ -89,6 +89,10 @@ struct GeneralTab: View {
                     .padding(8)
                 }
 
+                Text("You don't need to add \(ProjectInfo.name) to Login Items. macOS starts it whenever you click a link, and the default-browser setting survives restarts.")
+                    .font(.callout).foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
                 Button("See everything \(ProjectInfo.name) can do") { store.tab = .features }
                     .buttonStyle(.link)
             }

@@ -110,12 +110,14 @@ struct AboutTab: View {
                     .padding(8)
                 }
 
+                // Buttons, not Link: a Link would hand the URL to the system, which sends it back to this app.
                 HStack(spacing: 18) {
-                    Link("Source code", destination: ProjectInfo.repository)
-                    Link("Release notes", destination: ProjectInfo.releases)
-                    Link("Report an issue", destination: ProjectInfo.issues)
-                    Link("License", destination: ProjectInfo.license)
+                    Button("Source code") { openExternalLink(ProjectInfo.repository) }
+                    Button("Release notes") { openExternalLink(ProjectInfo.releases) }
+                    Button("Report an issue") { openExternalLink(ProjectInfo.issues) }
+                    Button("License") { openExternalLink(ProjectInfo.license) }
                 }
+                .buttonStyle(.link)
 
                 Button(store.diagnosticsCopied ? "Copied ✓" : "Copy diagnostics for a bug report") { store.copyDiagnostics() }
                 Text("The diagnostics contain the version, macOS version and profile count. No links or names.")

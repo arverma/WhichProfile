@@ -297,6 +297,15 @@ check(diag.contains("WhichProfile") && diag.contains("Profiles configured: 4") &
 check(!diag.contains("http") && !diag.contains("@"), "diagnostics contain no links or addresses")
 check(ProjectInfo.repository.absoluteString == "https://github.com/arverma/WhichProfile" && ProjectInfo.issues.absoluteString.hasSuffix("/issues"), "project links point at the repository")
 
+// MARK: - external links (the app's own links must never route back into the app)
+
+let chromeURL = URL(fileURLWithPath: "/Applications/Google Chrome.app")
+let safariURL = URL(fileURLWithPath: "/Applications/Safari.app")
+check(chooseExternalBrowser(lookup: { $0 == "com.google.Chrome" ? chromeURL : $0 == "com.apple.Safari" ? safariURL : nil }) == chromeURL, "Chrome is preferred for the app's own links")
+check(chooseExternalBrowser(lookup: { $0 == "com.apple.Safari" ? safariURL : nil }) == safariURL, "Safari is used when Chrome is missing")
+check(chooseExternalBrowser(lookup: { _ in nil }) == nil, "no browser found gives nil")
+check(!externalBrowserIdentifiers.contains("io.github.arverma.whichprofile"), "the app never picks itself for its own links")
+
 // MARK: - shared config helpers
 
 let storedConfig = configByStoring([profile("A", "Alpha"), profile("B", "")],

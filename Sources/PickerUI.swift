@@ -283,6 +283,9 @@ final class LinkPicker {
         }
     }
 
+    /// Hides the popup without reporting a result.
+    func dismiss() { close() }
+
     // MARK: State
 
     private var optionHeld: Bool { NSEvent.modifierFlags.contains(.option) }

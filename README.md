@@ -134,6 +134,7 @@ The `-n` flag is what makes Chrome honour `--profile-directory` even when it is 
 | Links open in Chrome without a popup | WhichProfile is not your default browser. Open it and use **Make Default…** on the General tab |
 | The popup shows an orange "Add your profiles" note | It could not read Chrome's profile list. Add profiles in the Profiles tab |
 | A private window does not open | Chrome profiles managed by an organisation can block private windows. Chrome decides, not WhichProfile |
+| Do I need to add it to Login Items? | No. macOS starts WhichProfile whenever you click a link, and the default-browser setting survives restarts |
 | A profile does not open | Check its directory in `chrome://version`. Run `--list-profiles` and read `~/Library/Logs/WhichProfile.log` |
 
 Still stuck? Open an [issue](https://github.com/arverma/WhichProfile/issues) and paste the text from **About → Copy diagnostics** (it contains no links or names).

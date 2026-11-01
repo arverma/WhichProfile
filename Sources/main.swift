@@ -32,19 +32,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let preselect = initialSelection(in: profiles, lastUsed: last, config: config)
         let link = prepareLink(url, config: config)
 
-        picker = LinkPicker(profiles: profiles) { chosen, isPrivate in
+        picker = LinkPicker(profiles: profiles) { [weak self] chosen, isPrivate in
             if let chosen = chosen {
                 UserDefaults.standard.set(chosen.dir, forKey: lastProfileKey)
                 launch(link.url, in: chosen, isPrivate: isPrivate)
             }
-            // The app is single-shot: quit after every use so nothing lingers.
-            NSApp.terminate(nil)
+            self?.linkFinished()
         }
         picker?.onSettings = { [weak self] in self?.openSettings(tab: .profiles) }
         picker?.show(url: link.url, cleaned: !link.removed.isEmpty, preselect: preselect, notice: resolved.warning)
     }
 
+    /// The link was opened or dismissed. The app is single-shot, so it quits, unless the settings
+    /// window is open (a link can arrive from another app while you are editing): then it stays.
+    private func linkFinished() {
+        pendingURL = nil
+        picker = nil
+        if settings == nil { NSApp.terminate(nil) }
+    }
+
     private func openSettings(tab: SettingsTab = .general) {
+        picker?.dismiss()
         picker = nil
         if let existing = settings {
             existing.show(tab: tab)
@@ -58,9 +66,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // Menu bar actions (see MainMenu.swift).
     @objc func showAbout() { openSettings(tab: .about) }
     @objc func showSettings() { openSettings(tab: .general) }
-    @objc func openHelp() { NSWorkspace.shared.open(ProjectInfo.repository) }
-    @objc func openReleases() { NSWorkspace.shared.open(ProjectInfo.releases) }
-    @objc func openIssues() { NSWorkspace.shared.open(ProjectInfo.issues) }
+    @objc func openHelp() { openExternalLink(ProjectInfo.repository) }
+    @objc func openReleases() { openExternalLink(ProjectInfo.releases) }
+    @objc func openIssues() { openExternalLink(ProjectInfo.issues) }
 
     private func settingsClosed() {
         settings = nil
