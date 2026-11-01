@@ -125,69 +125,78 @@ func runScripted(_ inputs: [String], detect: [Profile]?, existing: String? = nil
     return (wrote, output, path)
 }
 
+func saved(_ r: (Bool, String, String)) -> [ConfiguredProfile] { loadConfig(path: r.2).profiles }
+func cp(_ dir: String, _ name: String) -> ConfiguredProfile { ConfiguredProfile(dir: dir, name: name) }
+
 check(isValidProfileDir("Profile 3") && isValidProfileDir("Default"), "normal profile dirs are valid")
 check(!isValidProfileDir("") && !isValidProfileDir("../x") && !isValidProfileDir("a/b") && !isValidProfileDir("-flag"),
       "empty, traversal, slash and leading dash are rejected")
 
-let answers = applyDetectionAnswers(base, answers: ["", "-", "Two!"])
-check(answers.hidden == ["Profile 1"] && answers.labels == ["Profile 2": "Two!"], "detection answers map to hidden/labels")
-check(applyDetectionAnswers(base, answers: ["Default", "", ""]).labels.isEmpty, "re-typing the same name is not a label")
+let two = #"{ "profiles": [{ "dir": "Profile 3", "name": "Work" }, { "dir": "Default", "name": "Home" }] }"#
 
-// manual entry, with an invalid and a duplicate directory along the way
-let manual = runScripted(["Profile 3", "Work", "../x", "Default", "", "", "y"], detect: nil)
-check(manual.0, "manual setup writes the config")
-let manualConfig = loadConfig(path: manual.2)
-check(manualConfig.profiles == [ConfiguredProfile(dir: "Profile 3", name: "Work"), ConfiguredProfile(dir: "Default", name: nil)],
-      "manual setup stores profiles, rejecting invalid and duplicate dirs; got \(manualConfig.profiles)")
-check(manual.1.contains("doesn't look like"), "manual setup explains rejected entries")
-check(manual.1.contains("Return to finish"), "prompt tells the user how to finish")
+// adding, with the directory inline or asked for
+let added = runScripted(["a Profile 3", "Work", "a", "Default", "", "s"], detect: nil)
+check(added.0 && saved(added) == [cp("Profile 3", "Work"), cp("Default", "Default")], "add profiles inline and by prompt; got \(saved(added))")
+check(added.1.contains("chrome://version"), "adding explains where to find the directory")
 
-// detected flow keeps auto-detection (no profiles key) and records hidden/labels
-let detected = runScripted(["", "-", "Two!", "y"], detect: base)
-let detectedConfig = loadConfig(path: detected.2)
-check(detected.0 && detectedConfig.profiles.isEmpty && detectedConfig.hidden == ["Profile 1"] && detectedConfig.labels == ["Profile 2": "Two!"],
-      "detected setup writes hidden/labels without pinning profiles")
+let invalid = runScripted(["a ../x", "a Profile 3", "", "s"], detect: nil)
+check(saved(invalid) == [cp("Profile 3", "Profile 3")] && invalid.1.contains("doesn't look like"), "invalid directories are rejected")
 
-// re-running setup builds on existing profiles instead of replacing them
-let existingTwo = #"{ "profiles": [{ "dir": "Profile 3", "name": "Work" }, { "dir": "Default", "name": "Home" }] }"#
-let added = runScripted(["", "Profile 7", "School", "", "y"], detect: nil, existing: existingTwo)
-check(loadConfig(path: added.2).profiles.map(\.dir) == ["Profile 3", "Default", "Profile 7"], "setup adds to existing profiles by default")
+let dup = runScripted(["a Profile 3", "s"], detect: nil, existing: two)
+check(saved(dup).count == 2 && dup.1.contains("already in the list"), "adding an existing directory is refused")
 
-let renamed = runScripted(["", "Profile 3", "Work2", "", "y"], detect: nil, existing: existingTwo)
-check(loadConfig(path: renamed.2).profiles == [ConfiguredProfile(dir: "Profile 3", name: "Work2"), ConfiguredProfile(dir: "Default", name: "Home")],
-      "entering an existing directory renames it")
+let cancelAdd = runScripted(["a", "", "s"], detect: nil, existing: two)
+check(saved(cancelAdd).count == 2, "empty directory cancels adding")
 
-let kept2 = runScripted(["", "Profile 3", "", "", "y"], detect: nil, existing: existingTwo)
-check(loadConfig(path: kept2.2).profiles.first?.name == "Work", "empty rename keeps the current name")
+// editing an existing list
+let renamed = runScripted(["e 1", "Work2", "s"], detect: nil, existing: two)
+check(saved(renamed) == [cp("Profile 3", "Work2"), cp("Default", "Home")], "rename by number")
 
-let removed = runScripted(["", "-Default", "-Nope", "", "y"], detect: nil, existing: existingTwo)
-check(loadConfig(path: removed.2).profiles.map(\.dir) == ["Profile 3"] && removed.1.contains("Removed Default") && removed.1.contains("No profile \"Nope\""),
-      "-dir removes a profile and reports unknown ones")
+let renamedAsked = runScripted(["e", "2", "Casa", "s"], detect: nil, existing: two)
+check(saved(renamedAsked) == [cp("Profile 3", "Work"), cp("Default", "Casa")], "rename asks for the number when omitted")
 
-let startOver = runScripted(["n", "Profile 9", "", "", "y"], detect: nil, existing: existingTwo)
-check(loadConfig(path: startOver.2).profiles == [ConfiguredProfile(dir: "Profile 9", name: nil)], "answering n starts over")
+let deleted = runScripted(["d 2", "s"], detect: nil, existing: two)
+check(saved(deleted) == [cp("Profile 3", "Work")], "delete by number")
 
-let removeAll = runScripted(["", "-Profile 3", "-Default", "", "y"], detect: nil, existing: existingTwo)
-check(!removeAll.0 && loadConfig(path: removeAll.2).profiles.count == 2, "removing everything writes nothing and keeps the old file")
+let moved = runScripted(["u 2", "s"], detect: nil, existing: two)
+check(saved(moved) == [cp("Default", "Home"), cp("Profile 3", "Work")], "move up swaps with the previous profile")
 
-// declining writes nothing
-let declined = runScripted(["Profile 3", "", "", "n"], detect: nil)
-check(!declined.0 && !FileManager.default.fileExists(atPath: declined.2), "declining writes no file")
+let badNumber = runScripted(["d 9", "d x", "s"], detect: nil, existing: two)
+check(saved(badNumber).count == 2 && badNumber.1.contains("Enter a number from 1 to 2"), "bad numbers are rejected without changes")
 
-// no profiles entered writes nothing
-let none = runScripted([""], detect: nil)
-check(!none.0 && !FileManager.default.fileExists(atPath: none.2), "entering no profiles writes no file")
+let unknown = runScripted(["zzz", "s"], detect: nil, existing: two)
+check(unknown.1.contains("Type a letter") && saved(unknown).count == 2, "unknown commands are explained")
 
-// input ending early (EOF) writes nothing
-let eof = runScripted(["Profile 3"], detect: nil)
-check(!eof.0 && !FileManager.default.fileExists(atPath: eof.2), "EOF mid-setup writes no file")
+// saving and quitting
+let emptySave = runScripted(["s", "q"], detect: nil)
+check(!emptySave.0 && !FileManager.default.fileExists(atPath: emptySave.2) && emptySave.1.contains("Add at least one"),
+      "saving an empty list is refused and writes nothing")
 
-// existing settings survive and the old file is backed up
-let kept = runScripted(["Profile 3", "Work", "", "y"], detect: nil, existing: #"{ "order": ["Profile 3"], "rememberLast": false }"#)
-let keptConfig = loadConfig(path: kept.2)
-check(kept.0 && keptConfig.order == ["Profile 3"] && keptConfig.rememberLast == false && keptConfig.profiles.count == 1,
-      "existing settings are kept when setup rewrites the config")
-check(FileManager.default.fileExists(atPath: kept.2 + ".bak"), "previous config is backed up")
+let quitClean = runScripted(["q"], detect: nil, existing: two)
+check(!quitClean.0 && !FileManager.default.fileExists(atPath: quitClean.2 + ".bak"), "quitting with no changes writes nothing")
+
+let quitDiscard = runScripted(["d 1", "q", "y"], detect: nil, existing: two)
+check(!quitDiscard.0 && loadConfig(path: quitDiscard.2).profiles.count == 2, "quitting with changes asks, and discards on y")
+
+let quitKeep = runScripted(["d 1", "q", "n", "s"], detect: nil, existing: two)
+check(quitKeep.0 && saved(quitKeep) == [cp("Default", "Home")], "answering n keeps editing")
+
+let eof = runScripted(["a Profile 3"], detect: nil)
+check(!eof.0 && !FileManager.default.fileExists(atPath: eof.2), "input ending mid-flow writes nothing")
+
+// seeding and settings
+let fromChrome = runScripted(["s"], detect: [profile("Default", "Aman"), profile("Profile 1", "Work")])
+check(fromChrome.0 && saved(fromChrome) == [cp("Default", "Aman"), cp("Profile 1", "Work")], "starts from Chrome's profiles when readable")
+
+let chromeQuit = runScripted(["q", "y"], detect: [profile("Default")])
+check(!chromeQuit.0 && !FileManager.default.fileExists(atPath: chromeQuit.2), "unsaved Chrome-detected profiles ask before quitting")
+
+let baked = runScripted(["s"], detect: nil, existing: #"{ "profiles": [{ "dir": "A" }, { "dir": "B" }, { "dir": "C" }], "hidden": ["B"], "labels": { "A": "Alpha" }, "order": ["C"], "rememberLast": false }"#)
+let bakedConfig = loadConfig(path: baked.2)
+check(bakedConfig.profiles == [cp("C", "C"), cp("A", "Alpha")] && bakedConfig.hidden.isEmpty && bakedConfig.labels.isEmpty && bakedConfig.order.isEmpty,
+      "hidden, labels and order are folded into the saved list; got \(bakedConfig.profiles)")
+check(bakedConfig.rememberLast == false, "other settings survive")
+check(FileManager.default.fileExists(atPath: baked.2 + ".bak"), "previous config is backed up")
 
 // generated config stays short
 let encoded = String(data: try! encodeConfig(Config()), encoding: .utf8)!

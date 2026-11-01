@@ -1,6 +1,6 @@
 import Foundation
 
-// `ProfilePicker --setup`: an interactive way to create the config file without writing JSON.
+// `ProfilePicker --setup`: a small menu for editing your profile list without writing JSON.
 
 /// Input/output seams so the whole flow can be driven by scripted input in tests.
 struct SetupIO {
@@ -13,129 +13,151 @@ func isValidProfileDir(_ dir: String) -> Bool {
     !dir.isEmpty && dir.count <= 64 && !dir.contains("/") && !dir.contains("..") && !dir.hasPrefix("-")
 }
 
-/// Interprets one answer per detected profile: empty keeps the name, "-" hides the profile,
-/// anything else becomes its new label.
-func applyDetectionAnswers(_ profiles: [Profile], answers: [String]) -> (labels: [String: String], hidden: [String]) {
-    var labels: [String: String] = [:]
-    var hidden: [String] = []
-    for (profile, answer) in zip(profiles, answers) {
-        if answer == "-" { hidden.append(profile.dir) }
-        else if !answer.isEmpty && answer != profile.name { labels[profile.dir] = answer }
-    }
-    return (labels, hidden)
-}
-
 func encodeConfig(_ config: Config) throws -> Data {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
     return try encoder.encode(config)
 }
 
-private func describe(_ profiles: [ConfiguredProfile]) -> String {
-    profiles.map { "  \($0.dir)  →  \($0.name ?? $0.dir)\n" }.joined()
-}
+/// Raised when input ends (Ctrl-D or a closed pipe) so the flow can stop without writing anything.
+private struct InputEnded: Error {}
 
 /// Runs the interactive setup. Returns true if a config file was written.
+///
+/// The list starts from your saved profiles, or from Chrome's own list if that is readable,
+/// or empty. Existing `hidden`, `labels` and `order` settings are folded into the list, because
+/// the saved list is the single source of truth. Nothing is written until you choose Save.
 @discardableResult
 func runSetup(io: SetupIO, detect: () -> [Profile]?, path: String = configPath) -> Bool {
-    func ask(_ prompt: String) -> String? {
+    func ask(_ prompt: String) throws -> String {
         io.write(prompt)
-        return io.read()?.trimmingCharacters(in: .whitespaces)
+        guard let line = io.read() else { throw InputEnded() }
+        return line.trimmingCharacters(in: .whitespaces)
     }
 
-    io.write("Profile Picker setup\n\n")
-    var config = loadConfig(path: path)   // start from the existing file so other settings are kept
-    if FileManager.default.fileExists(atPath: path) {
-        io.write("Found an existing config at \(path). Its other settings will be kept.\n\n")
-    }
+    var config = loadConfig(path: path)
+    var list: [Profile]
+    var dirty = false
 
-    if let detected = detect() {
-        io.write("Found \(detected.count) Chrome profile(s). For each one, press Return to keep the name,\n")
-        io.write("type a new name to rename it, or type - to hide it.\n\n")
-        var answers: [String] = []
-        for profile in detected {
-            guard let answer = ask("  [\(profile.dir)] \(profile.name): ") else { return false }
-            answers.append(answer)
-        }
-        let result = applyDetectionAnswers(detected, answers: answers)
-        config.profiles = []
-        config.labels = result.labels
-        config.hidden = result.hidden
+    if !config.profiles.isEmpty {
+        list = arrange(config.profiles.map { Profile(dir: $0.dir, name: $0.name ?? $0.dir) }, with: config)
+    } else if let detected = detect() {
+        list = arrange(detected, with: config)
+        dirty = true   // found in Chrome but not saved yet
     } else {
-        io.write("Chrome's profile list can't be read (macOS protects other apps' data), so enter your\n")
-        io.write("profiles by hand. To find a profile's directory: open it in Chrome, go to chrome://version,\n")
-        io.write("and take the last part of \"Profile Path\" (for example Default or Profile 3).\n\n")
+        list = []
+    }
 
-        var entered = config.profiles
-        if !entered.isEmpty {
-            io.write("Current profiles:\n\(describe(entered))\n")
-            guard let keep = ask("Keep these and add more? [Y/n] (n starts over) ") else { return false }
-            if keep.lowercased().hasPrefix("n") { entered = [] }
-            io.write("\n")
+    func showList() {
+        if list.isEmpty {
+            io.write("You haven't added any profiles yet.\n")
+            return
         }
-        io.write("Enter a directory to add a profile, or an existing one to rename it.\n")
-        io.write("Type -<directory> (for example -Profile 3) to remove one.\n\n")
-
-        while true {
-            if !entered.isEmpty { io.write("Profiles so far:\n\(describe(entered))") }
-            let hint = entered.isEmpty ? "Profile directory" : "Another profile directory, or Return to finish"
-            guard let input = ask("\(hint): ") else { return false }
-            if input.isEmpty { break }
-
-            if input.hasPrefix("-") {
-                let dir = String(input.dropFirst()).trimmingCharacters(in: .whitespaces)
-                if let i = entered.firstIndex(where: { $0.dir == dir }) {
-                    entered.remove(at: i)
-                    io.write("  Removed \(dir).\n")
-                } else {
-                    io.write("  No profile \"\(dir)\" to remove.\n")
-                }
-                continue
-            }
-            guard isValidProfileDir(input) else {
-                io.write("  That doesn't look like a profile directory name; try again.\n")
-                continue
-            }
-            if let i = entered.firstIndex(where: { $0.dir == input }) {
-                let current = entered[i].name ?? input
-                guard let name = ask("  \(input) is already listed as \"\(current)\". New name (Return to keep): ") else { return false }
-                if !name.isEmpty { entered[i].name = name }
-            } else {
-                guard let name = ask("  Name shown in the popup (Return to use \"\(input)\"): ") else { return false }
-                entered.append(ConfiguredProfile(dir: input, name: name.isEmpty ? nil : name))
-            }
+        io.write("Your Chrome profiles:\n")
+        for (i, p) in list.enumerated() {
+            io.write("  \(i + 1). \(p.name)\(p.name == p.dir ? "" : "  (\(p.dir))")\n")
         }
-        if entered.isEmpty {
-            io.write("\nNo profiles entered. Nothing was written.\n")
+    }
+
+    /// Reads "3" from the command's argument or by asking; nil (with a message) if it isn't valid.
+    func pickNumber(_ arg: String, _ question: String) throws -> Int? {
+        if list.isEmpty { io.write("There are no profiles yet. Press a to add one.\n"); return nil }
+        let text = arg.isEmpty ? try ask(question) : arg
+        guard let n = Int(text), (1...list.count).contains(n) else {
+            io.write("Enter a number from 1 to \(list.count).\n")
+            return nil
+        }
+        return n - 1
+    }
+
+    func save() -> Bool {
+        config.profiles = list.map { ConfiguredProfile(dir: $0.dir, name: $0.name) }
+        config.hidden = []; config.labels = [:]; config.order = []   // now part of the list itself
+        guard let json = try? encodeConfig(config) else {
+            io.write("Could not encode the configuration.\n")
             return false
         }
-        config.profiles = entered
-    }
-
-    guard let json = try? encodeConfig(config), let text = String(data: json, encoding: .utf8) else {
-        io.write("Could not encode the configuration.\n")
-        return false
-    }
-    io.write("\nThis will be written to \(path):\n\n\(text)\n\n")
-    guard let confirm = ask("Write it? [Y/n] "), confirm.isEmpty || confirm.lowercased().hasPrefix("y") else {
-        io.write("Nothing was written.\n")
-        return false
-    }
-
-    let fm = FileManager.default
-    do {
-        try fm.createDirectory(atPath: (path as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
-        if fm.fileExists(atPath: path) {
-            let backup = path + ".bak"
-            try? fm.removeItem(atPath: backup)
-            try fm.copyItem(atPath: path, toPath: backup)
-            io.write("Previous config saved to \(backup)\n")
+        let fm = FileManager.default
+        do {
+            try fm.createDirectory(atPath: (path as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+            var backedUp = false
+            if fm.fileExists(atPath: path) {
+                try? fm.removeItem(atPath: path + ".bak")
+                try fm.copyItem(atPath: path, toPath: path + ".bak")
+                backedUp = true
+            }
+            try (json + Data("\n".utf8)).write(to: URL(fileURLWithPath: path), options: .atomic)
+            io.write("\nSaved \(list.count) profile\(list.count == 1 ? "" : "s") to \(path)\n")
+            if backedUp { io.write("Your previous settings are in \(path).bak\n") }
+            io.write("If you haven't yet, set Profile Picker as your default browser in\nSystem Settings → Desktop & Dock.\n")
+            return true
+        } catch {
+            io.write("Could not write the config: \(error.localizedDescription)\n")
+            return false
         }
-        try (json + Data("\n".utf8)).write(to: URL(fileURLWithPath: path), options: .atomic)
+    }
+
+    do {
+        io.write("Profile Picker setup\nChoose which Chrome profiles appear when you click a link.\n\n")
+        while true {
+            showList()
+            io.write("\n  [a] Add   [e] Rename   [d] Delete   [u] Move up   [s] Save   [q] Quit\n")
+            let input = try ask("> ")
+            let command = input.first.map { String($0).lowercased() } ?? ""
+            let arg = String(input.dropFirst()).trimmingCharacters(in: .whitespaces)
+            io.write("\n")
+
+            switch command {
+            case "a":
+                io.write("In Chrome, open the profile and go to chrome://version. The last part of\n")
+                io.write("\"Profile Path\" is its directory, for example Default or Profile 3.\n")
+                let dir = arg.isEmpty ? try ask("Directory (Return to cancel): ") : arg
+                if dir.isEmpty { break }
+                if !isValidProfileDir(dir) {
+                    io.write("That doesn't look like a profile directory name.\n")
+                } else if let existing = list.first(where: { $0.dir == dir }) {
+                    io.write("\(dir) is already in the list as \"\(existing.name)\". Use e to rename it.\n")
+                } else {
+                    let name = try ask("Name to show in the popup (Return to use \"\(dir)\"): ")
+                    list.append(Profile(dir: dir, name: name.isEmpty ? dir : name))
+                    dirty = true
+                }
+
+            case "e":
+                if let i = try pickNumber(arg, "Rename which number? ") {
+                    let name = try ask("New name for \"\(list[i].name)\" (Return to cancel): ")
+                    if !name.isEmpty { list[i].name = name; dirty = true }
+                }
+
+            case "d":
+                if let i = try pickNumber(arg, "Delete which number? ") {
+                    io.write("Deleted \"\(list[i].name)\".\n")
+                    list.remove(at: i)
+                    dirty = true
+                }
+
+            case "u":
+                if let i = try pickNumber(arg, "Move which number up? ") {
+                    if i == 0 { io.write("It's already first.\n") }
+                    else { list.swapAt(i, i - 1); dirty = true }
+                }
+
+            case "s":
+                if list.isEmpty { io.write("Add at least one profile first.\n") }
+                else { return save() }
+
+            case "q":
+                if !dirty { return false }
+                let answer = try ask("Quit without saving your changes? [y/N] ")
+                if answer.lowercased().hasPrefix("y") { return false }
+
+            default:
+                io.write("Type a letter from the menu.\n")
+            }
+            io.write("\n")
+        }
     } catch {
-        io.write("Could not write the config: \(error.localizedDescription)\n")
+        io.write("\nInput ended. Nothing was saved.\n")
         return false
     }
-    io.write("Saved. Set Profile Picker as your default browser (System Settings → Desktop & Dock) if you haven't yet.\n")
-    return true
 }
