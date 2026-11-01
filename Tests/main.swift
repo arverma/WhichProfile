@@ -109,4 +109,65 @@ check(chromeLaunchArguments(url: url, profile: profile("Profile 3")) ==
       ["-na", "Google Chrome", "--args", "--profile-directory=Profile 3", "https://example.com/a?b=c"],
       "launch arguments target the right profile and URL")
 
+// MARK: - setup
+
+/// Runs setup with scripted answers against a temp config path. Returns (wrote, output, path).
+func runScripted(_ inputs: [String], detect: [Profile]?, existing: String? = nil) -> (Bool, String, String) {
+    let path = NSTemporaryDirectory() + "pp-setup-\(UUID().uuidString)/config.json"
+    if let existing = existing {
+        try? FileManager.default.createDirectory(atPath: (path as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+        try? existing.write(toFile: path, atomically: true, encoding: .utf8)
+    }
+    var remaining = inputs
+    var output = ""
+    let io = SetupIO(read: { remaining.isEmpty ? nil : remaining.removeFirst() }, write: { output += $0 })
+    let wrote = runSetup(io: io, detect: { detect }, path: path)
+    return (wrote, output, path)
+}
+
+check(isValidProfileDir("Profile 3") && isValidProfileDir("Default"), "normal profile dirs are valid")
+check(!isValidProfileDir("") && !isValidProfileDir("../x") && !isValidProfileDir("a/b") && !isValidProfileDir("-flag"),
+      "empty, traversal, slash and leading dash are rejected")
+
+let answers = applyDetectionAnswers(base, answers: ["", "-", "Two!"])
+check(answers.hidden == ["Profile 1"] && answers.labels == ["Profile 2": "Two!"], "detection answers map to hidden/labels")
+check(applyDetectionAnswers(base, answers: ["Default", "", ""]).labels.isEmpty, "re-typing the same name is not a label")
+
+// manual entry, with an invalid and a duplicate directory along the way
+let manual = runScripted(["Profile 3", "Work", "../x", "Profile 3", "Default", "", "", "y"], detect: nil)
+check(manual.0, "manual setup writes the config")
+let manualConfig = loadConfig(path: manual.2)
+check(manualConfig.profiles == [ConfiguredProfile(dir: "Profile 3", name: "Work"), ConfiguredProfile(dir: "Default", name: nil)],
+      "manual setup stores profiles, rejecting invalid and duplicate dirs; got \(manualConfig.profiles)")
+check(manual.1.contains("doesn't look like") && manual.1.contains("Already added"), "manual setup explains rejected entries")
+
+// detected flow keeps auto-detection (no profiles key) and records hidden/labels
+let detected = runScripted(["", "-", "Two!", "y"], detect: base)
+let detectedConfig = loadConfig(path: detected.2)
+check(detected.0 && detectedConfig.profiles.isEmpty && detectedConfig.hidden == ["Profile 1"] && detectedConfig.labels == ["Profile 2": "Two!"],
+      "detected setup writes hidden/labels without pinning profiles")
+
+// declining writes nothing
+let declined = runScripted(["Profile 3", "", "", "n"], detect: nil)
+check(!declined.0 && !FileManager.default.fileExists(atPath: declined.2), "declining writes no file")
+
+// no profiles entered writes nothing
+let none = runScripted([""], detect: nil)
+check(!none.0 && !FileManager.default.fileExists(atPath: none.2), "entering no profiles writes no file")
+
+// input ending early (EOF) writes nothing
+let eof = runScripted(["Profile 3"], detect: nil)
+check(!eof.0 && !FileManager.default.fileExists(atPath: eof.2), "EOF mid-setup writes no file")
+
+// existing settings survive and the old file is backed up
+let kept = runScripted(["Profile 3", "Work", "", "y"], detect: nil, existing: #"{ "order": ["Profile 3"], "rememberLast": false }"#)
+let keptConfig = loadConfig(path: kept.2)
+check(kept.0 && keptConfig.order == ["Profile 3"] && keptConfig.rememberLast == false && keptConfig.profiles.count == 1,
+      "existing settings are kept when setup rewrites the config")
+check(FileManager.default.fileExists(atPath: kept.2 + ".bak"), "previous config is backed up")
+
+// generated config stays short
+let encoded = String(data: try! encodeConfig(Config()), encoding: .utf8)!
+check(!encoded.contains("hidden") && !encoded.contains("rememberLast"), "default values are omitted from generated JSON")
+
 if failures == 0 { print("All tests passed") } else { print("\(failures) test(s) failed"); exit(1) }

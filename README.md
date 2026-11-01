@@ -49,7 +49,15 @@ The picker first tries to read your profiles from Chrome's `Local State` file. *
 
 You have two ways to fix that:
 
-1. **Declare your profiles** in `~/.config/profile-picker/config.json` (recommended, needs no special permission):
+1. **Declare your profiles** (recommended, needs no special permission). The easy way is the interactive setup:
+
+   ```bash
+   ~/Applications/ProfilePicker.app/Contents/MacOS/ProfilePicker --setup
+   ```
+
+   It asks for each profile's directory and the name to show, shows you the resulting file, and writes it only after you confirm. An existing config is backed up to `config.json.bak` and its other settings are kept. If Chrome's profile list is readable (Full Disk Access, below), setup instead lists the detected profiles and lets you rename or hide each one.
+
+   Or edit `~/.config/profile-picker/config.json` by hand:
 
    ```json
    {
@@ -121,9 +129,24 @@ build.sh      build and install
 
 Covers profile parsing and ordering, config handling, last-used selection and the launch command.
 
+## Command line
+
+```
+ProfilePicker --setup           interactively create the config file
+ProfilePicker --list-profiles   print the profiles the picker would show
+ProfilePicker --help            show usage
+```
+
 ## Debugging
 
 Actions are logged to `~/Library/Logs/ProfilePicker.log`. URLs are not logged.
+
+Two environment variables help when developing or testing without touching your real files:
+
+| Variable | Effect |
+|---|---|
+| `PROFILE_PICKER_CONFIG` | Use this config file path instead of `~/.config/profile-picker/config.json` |
+| `PROFILE_PICKER_LOG` | Write the log here instead of `~/Library/Logs/ProfilePicker.log` |
 
 ## Known limitations
 

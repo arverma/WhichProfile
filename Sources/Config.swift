@@ -29,6 +29,18 @@ struct Config: Codable, Equatable {
 
     init() {}
 
+    private enum CodingKeys: String, CodingKey { case profiles, hidden, order, labels, rememberLast }
+
+    /// Omits empty and default values so a generated config file stays short.
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        if !profiles.isEmpty { try c.encode(profiles, forKey: .profiles) }
+        if !hidden.isEmpty { try c.encode(hidden, forKey: .hidden) }
+        if !order.isEmpty { try c.encode(order, forKey: .order) }
+        if !labels.isEmpty { try c.encode(labels, forKey: .labels) }
+        if !rememberLast { try c.encode(rememberLast, forKey: .rememberLast) }
+    }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         profiles = try c.decodeIfPresent([ConfiguredProfile].self, forKey: .profiles) ?? []
@@ -39,7 +51,9 @@ struct Config: Codable, Equatable {
     }
 }
 
-let configPath = NSHomeDirectory() + "/.config/profile-picker/config.json"
+/// `$PROFILE_PICKER_CONFIG` overrides the location (used for testing without touching your real config).
+let configPath = ProcessInfo.processInfo.environment["PROFILE_PICKER_CONFIG"]
+    ?? NSHomeDirectory() + "/.config/profile-picker/config.json"
 
 func loadConfig(path: String = configPath) -> Config {
     guard let data = FileManager.default.contents(atPath: path) else { return Config() }

@@ -42,6 +42,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+if CommandLine.arguments.contains("--help") || CommandLine.arguments.contains("-h") {
+    print("""
+    Profile Picker: choose which Chrome profile opens a link.
+
+    Usage: ProfilePicker [option]
+      --setup           interactively create ~/.config/profile-picker/config.json
+      --list-profiles   print the profiles the picker would show
+      --help            show this help
+    """)
+    exit(0)
+}
+
+// `ProfilePicker --setup` walks through creating the config file.
+if CommandLine.arguments.contains("--setup") {
+    let io = SetupIO(read: { readLine() }, write: { print($0, terminator: ""); fflush(stdout) })
+    exit(runSetup(io: io, detect: { loadChromeProfiles() }) ? 0 : 1)
+}
+
 // `ProfilePicker --list-profiles` prints the profiles the picker would show, for debugging.
 if CommandLine.arguments.contains("--list-profiles") {
     let config = loadConfig()
