@@ -102,7 +102,47 @@ try? #"{ "profiles": [{ "dir": "Profile 3", "name": "Work" }, { "dir": "Default"
 check(loadConfig(path: tmp).profiles == [ConfiguredProfile(dir: "Profile 3", name: "Work"), ConfiguredProfile(dir: "Default", name: nil)],
       "profiles decode from config JSON")
 
+// MARK: - link cleaning
+
+func cleaned(_ s: String) -> String { cleanLink(URL(string: s)!).url.absoluteString }
+func removedNames(_ s: String) -> [String] { cleanLink(URL(string: s)!).removed }
+
+check(cleaned("https://example.com/a?utm_source=x&utm_medium=y&id=5") == "https://example.com/a?id=5", "utm_* removed, other parameters kept")
+check(cleaned("https://example.com/a?id=5&fbclid=abc&page=2") == "https://example.com/a?id=5&page=2", "fbclid removed from the middle, order kept")
+check(cleaned("https://example.com/a?gclid=1") == "https://example.com/a", "a query of only trackers disappears, including the ?")
+check(cleaned("https://example.com/?utm_campaign=x#section") == "https://example.com/#section", "fragment is kept")
+check(cleaned("https://example.com/a?q=caf%C3%A9&utm_source=x") == "https://example.com/a?q=caf%C3%A9", "kept parameters are not re-encoded")
+check(cleaned("https://example.com/a?UTM_Source=x&FBCLID=1&x=1") == "https://example.com/a?x=1", "matching ignores case")
+check(cleaned("https://example.com/a?utm%5Fsource=x&x=1") == "https://example.com/a?x=1", "percent-encoded names are recognised")
+check(cleaned("https://example.com/a?x=1&&y=2&utm_term=z") == "https://example.com/a?x=1&y=2", "empty pairs are dropped when rewriting")
+check(removedNames("https://example.com/?utm_source=a&gclid=b&q=1") == ["utm_source", "gclid"], "reports which parameters were removed")
+
+// links that must not change
+for untouched in ["https://example.com/a?id=5&ref=home&token=abc&si=xyz",
+                  "https://example.com/a",
+                  "https://example.com/#/route?utm_source=x",
+                  "mailto:me@example.com?subject=x&utm_source=y",
+                  "file:///tmp/a.html?utm_source=x"] {
+    check(cleaned(untouched) == untouched && removedNames(untouched).isEmpty, "unchanged: \(untouched)")
+}
+check(cleaned("https://example.com/a?utm_source") == "https://example.com/a", "a tracker name without a value is removed")
+
+var cleanOff = Config(); cleanOff.cleanLinks = false
+check(prepareLink(URL(string: "https://e.com/?utm_source=x")!, config: cleanOff).url.absoluteString == "https://e.com/?utm_source=x", "cleaning can be switched off")
+check(prepareLink(URL(string: "https://e.com/?utm_source=x")!, config: Config()).url.absoluteString == "https://e.com/", "cleaning is on by default")
+check(!String(data: try! encodeConfig(Config()), encoding: .utf8)!.contains("cleanLinks"), "default cleanLinks is omitted from generated JSON")
+check(String(data: try! encodeConfig(cleanOff), encoding: .utf8)!.contains("\"cleanLinks\" : false"), "cleanLinks=false is written")
+try? #"{ "cleanLinks": false }"#.write(toFile: tmp, atomically: true, encoding: .utf8)
+check(loadConfig(path: tmp).cleanLinks == false, "cleanLinks decodes from config")
+
 // MARK: - launch arguments
+
+check(chromeLaunchArguments(url: URL(string: "https://example.com")!, profile: profile("Profile 3"), isPrivate: true) ==
+      ["-na", "Google Chrome", "--args", "--profile-directory=Profile 3", "--incognito", "https://example.com"],
+      "private mode adds --incognito before the URL")
+check(!chromeLaunchArguments(url: URL(string: "https://example.com")!, profile: profile("Default")).contains("--incognito"),
+      "normal mode has no --incognito")
+
 
 let url = URL(string: "https://example.com/a?b=c")!
 check(chromeLaunchArguments(url: url, profile: profile("Profile 3")) ==

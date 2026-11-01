@@ -8,7 +8,8 @@ import Foundation
 ///       "hidden": ["Profile 5"],
 ///       "order": ["Profile 3", "Default"],
 ///       "labels": { "Profile 3": "Work" },
-///       "rememberLast": true
+///       "rememberLast": true,
+///       "cleanLinks": true
 ///     }
 ///
 /// Keys are Chrome profile directory names (`Default`, `Profile 3`, ...).
@@ -26,10 +27,12 @@ struct Config: Codable, Equatable {
     var order: [String] = []
     var labels: [String: String] = [:]
     var rememberLast: Bool = true
+    /// Remove tracking parameters (utm_*, fbclid, …) from links before opening them.
+    var cleanLinks: Bool = true
 
     init() {}
 
-    private enum CodingKeys: String, CodingKey { case profiles, hidden, order, labels, rememberLast }
+    private enum CodingKeys: String, CodingKey { case profiles, hidden, order, labels, rememberLast, cleanLinks }
 
     /// Omits empty and default values so a generated config file stays short.
     func encode(to encoder: Encoder) throws {
@@ -39,6 +42,7 @@ struct Config: Codable, Equatable {
         if !order.isEmpty { try c.encode(order, forKey: .order) }
         if !labels.isEmpty { try c.encode(labels, forKey: .labels) }
         if !rememberLast { try c.encode(rememberLast, forKey: .rememberLast) }
+        if !cleanLinks { try c.encode(cleanLinks, forKey: .cleanLinks) }
     }
 
     init(from decoder: Decoder) throws {
@@ -48,6 +52,7 @@ struct Config: Codable, Equatable {
         order = try c.decodeIfPresent([String].self, forKey: .order) ?? []
         labels = try c.decodeIfPresent([String: String].self, forKey: .labels) ?? [:]
         rememberLast = try c.decodeIfPresent(Bool.self, forKey: .rememberLast) ?? true
+        cleanLinks = try c.decodeIfPresent(Bool.self, forKey: .cleanLinks) ?? true
     }
 }
 

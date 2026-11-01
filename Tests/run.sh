@@ -7,6 +7,6 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 swiftc -swift-version 5 \
-    Sources/Model.swift Sources/ChromeProfiles.swift Sources/Config.swift Sources/Launcher.swift Sources/Setup.swift Sources/ProfileList.swift \
+    Sources/Model.swift Sources/ChromeProfiles.swift Sources/Config.swift Sources/Launcher.swift Sources/Setup.swift Sources/ProfileList.swift Sources/LinkCleaner.swift \
     Tests/main.swift -o "$TMP/tests"
 WHICHPROFILE_LOG=/dev/null "$TMP/tests"

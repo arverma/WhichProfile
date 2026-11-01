@@ -19,21 +19,24 @@ func log(_ msg: String) {
 
 // MARK: - Launching
 
-/// Arguments for `/usr/bin/open` that open `url` in the given Chrome profile.
-/// `-n` is required so Chrome receives `--profile-directory` even when it is already
-/// running; the new process hands the URL to the running instance and exits.
-func chromeLaunchArguments(url: URL, profile: Profile) -> [String] {
-    ["-na", "Google Chrome", "--args", "--profile-directory=\(profile.dir)", url.absoluteString]
+/// Arguments for `/usr/bin/open` that open `url` in the given Chrome profile, optionally in a
+/// private (incognito) window. `-n` is required so Chrome receives `--profile-directory` even
+/// when it is already running; the new process hands the URL to the running instance and exits.
+func chromeLaunchArguments(url: URL, profile: Profile, isPrivate: Bool = false) -> [String] {
+    var args = ["-na", "Google Chrome", "--args", "--profile-directory=\(profile.dir)"]
+    if isPrivate { args.append("--incognito") }
+    args.append(url.absoluteString)
+    return args
 }
 
-func launch(_ url: URL, in profile: Profile) {
+func launch(_ url: URL, in profile: Profile, isPrivate: Bool = false) {
     let p = Process()
     p.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-    p.arguments = chromeLaunchArguments(url: url, profile: profile)
+    p.arguments = chromeLaunchArguments(url: url, profile: profile, isPrivate: isPrivate)
     do {
         try p.run()
         p.waitUntilExit()
-        log("launch \(profile.dir) status=\(p.terminationStatus)")
+        log("launch \(profile.dir)\(isPrivate ? " (private)" : "") status=\(p.terminationStatus)")
     } catch {
         log("launch \(profile.dir) FAILED: \(error)")
     }
