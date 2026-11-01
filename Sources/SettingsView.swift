@@ -54,9 +54,19 @@ private func profilesFromChosenFolder() -> [Profile]? {
     panel.allowsMultipleSelection = false
     panel.showsHiddenFiles = true
     panel.directoryURL = URL(fileURLWithPath: NSHomeDirectory() + "/Library/Application Support/Google")
-    guard panel.runModal() == .OK, let folder = panel.url else { return nil }
-    guard let data = try? Data(contentsOf: folder.appendingPathComponent("Local State")) else { return nil }
+    guard panel.runModal() == .OK, let folder = panel.url else {
+        log("detect: folder picker cancelled")
+        return nil
+    }
+    let file = folder.appendingPathComponent("Local State")
+    let data: Data
+    do { data = try Data(contentsOf: file) }
+    catch {
+        log("detect: could not read \(file.path) after the folder was chosen: \(error.localizedDescription)")
+        return nil
+    }
     let profiles = parseLocalState(data)
+    log("detect: read \(profiles.count) profile(s) from the chosen folder")
     return profiles.isEmpty ? nil : profiles
 }
 
