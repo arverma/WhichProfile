@@ -57,3 +57,13 @@ struct ProfileList: Equatable {
         items.insert(contentsOf: moving, at: insertAt)
     }
 }
+
+/// Wording for the "remove?" confirmation. There is no undo, so the message says what to do instead.
+func removalPrompt(for names: [String]) -> (title: String, message: String) {
+    let readdHint = "You can add it back later with Add Profile… or Detect from Chrome."
+    if names.count == 1 {
+        return ("Remove “\(names[0])”?", "It will no longer appear when you click a link. " + readdHint)
+    }
+    return ("Remove \(names.count) profiles?",
+            "They will no longer appear when you click a link. You can add them back later with Add Profile… or Detect from Chrome.")
+}

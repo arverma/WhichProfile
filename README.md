@@ -48,7 +48,7 @@ Links clicked inside Chrome itself never go through the default browser, so they
 
 Open **Profile Picker** like any app (Spotlight, Finder, Launchpad), or choose **Edit profiles…** in the popup. There you can:
 
-- **Rename** a profile by double-clicking its name (or the pencil next to it; Return saves, Esc cancels), **reorder** by dragging, and **remove** it with the trash icon at the end of its row (or the Delete key on a selected row)
+- **Rename** a profile by double-clicking its name (or the pencil next to it; Return saves, Esc cancels), **reorder** by dragging, and **remove** it with the trash icon at the end of its row (or the Delete key on a selected row). Removing asks for confirmation and cannot be undone, but a removed profile can be added back with Add Profile… or Detect from Chrome
 - **Add Profile…** by entering its directory (the dialog explains where to find it) and a name
 - **Detect from Chrome** to import your profiles automatically. If macOS blocks reading Chrome's data, you are asked to select Chrome's data folder (`~/Library/Application Support/Google/Chrome`), which grants access
 - Choose whether the **last used profile is pre-selected**

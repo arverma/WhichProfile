@@ -118,7 +118,7 @@ struct SettingsView: View {
                             }
                             Spacer()
                             Text(profile.dir).font(.caption).foregroundColor(.secondary)
-                            Button { remove(profile.id) } label: { icon("delete", fallback: "trash") }
+                            Button { confirmRemoval(of: [profile.id]) } label: { icon("delete", fallback: "trash") }
                                 .buttonStyle(.borderless)
                                 .foregroundColor(.secondary)
                                 .help("Remove \(profile.name)")
@@ -180,15 +180,37 @@ struct SettingsView: View {
         }
     }
 
-    private func remove(_ id: String) {
-        store.list.remove(ids: [id])
-        store.selection.remove(id)
-        if store.editingID == id { store.editingID = nil }
+    /// Asks before removing, since there is no undo. Cancel is the default button so that
+    /// pressing Return by accident does not delete anything.
+    private func confirmRemoval(of ids: Set<String>) {
+        let names = store.list.items.filter { ids.contains($0.id) }.map(\.name)
+        guard !names.isEmpty else { return }
+        let prompt = removalPrompt(for: names)
+
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = prompt.title
+        alert.informativeText = prompt.message
+        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Remove")
+        alert.buttons[1].hasDestructiveAction = true
+
+        let finish: (NSApplication.ModalResponse) -> Void = { response in
+            guard response == .alertSecondButtonReturn else { return }
+            store.list.remove(ids: ids)
+            store.selection.subtract(ids)
+            if let editing = store.editingID, ids.contains(editing) { store.editingID = nil }
+        }
+        if let window = NSApp.keyWindow {
+            alert.beginSheetModal(for: window, completionHandler: finish)
+        } else {
+            finish(alert.runModal())
+        }
     }
 
     /// Delete key on the selected rows.
     private func removeSelected() {
-        for id in store.selection { remove(id) }
+        confirmRemoval(of: store.selection)
     }
 
     private func detect() {

@@ -234,6 +234,11 @@ check(mv.items.map(\.dir) == ["d", "b", "c", "a"], "move to the front")
 mv.move(from: IndexSet([0, 1]), to: 4)
 check(mv.items.map(\.dir) == ["c", "a", "d", "b"], "moving several items keeps their order; got \(mv.items.map(\.dir))")
 
+let one = removalPrompt(for: ["Work"])
+check(one.title == "Remove “Work”?" && one.message.contains("add it back"), "single removal names the profile and says how to restore it")
+let many = removalPrompt(for: ["A", "B", "C"])
+check(many.title == "Remove 3 profiles?" && many.message.contains("add them back"), "multiple removal uses plural wording")
+
 // MARK: - shared config helpers
 
 let storedConfig = configByStoring([profile("A", "Alpha"), profile("B", "")],
