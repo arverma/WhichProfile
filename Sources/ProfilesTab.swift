@@ -1,81 +1,11 @@
 import SwiftUI
 import AppKit
 
-// MARK: - Store
-
-/// Holds the settings being edited and saves them to the config file after every change.
-final class SettingsStore: ObservableObject {
-    @Published var list: ProfileList
-    @Published var rememberLast: Bool
-    @Published var status: String?
-
-    // View state lives here rather than in @State: on machines with only the command-line tools
-    // installed, @State is a macro whose plugin is missing, so it would not compile.
-    @Published var selection = Set<String>()
-    @Published var showingAdd = false
-    @Published var editingID: String?   // the profile whose name is being edited
-    @Published var isDefault = isDefaultBrowser()
-    let addModel = AddProfileModel()
-
-    private var config: Config
-    private let path: String
-    private var savedOnce = false
-
-    init(path: String = configPath, detect: () -> [Profile]?) {
-        self.path = path
-        let config = loadConfig(path: path)
-        self.config = config
-        self.list = ProfileList(items: initialProfileList(config: config, detect: detect).list)
-        self.rememberLast = config.rememberLast
-    }
-
-    func save() {
-        var updated = configByStoring(list.items, in: config)
-        updated.rememberLast = rememberLast
-        do {
-            // Back up the file as it was when the window opened, once, not on every keystroke.
-            try saveConfig(updated, to: path, backup: !savedOnce)
-            savedOnce = true
-            config = updated
-        } catch {
-            status = "Couldn't save your changes: \(error.localizedDescription)"
-        }
-    }
-}
-
-// MARK: - Reading Chrome's profile list
-
-/// Lets the user point at Chrome's data folder, which also grants this app permission to read it.
-private func profilesFromChosenFolder() -> [Profile]? {
-    let panel = NSOpenPanel()
-    panel.message = "To list your profiles, select Chrome's data folder (Google/Chrome) and click Open."
-    panel.prompt = "Open"
-    panel.canChooseFiles = false
-    panel.canChooseDirectories = true
-    panel.allowsMultipleSelection = false
-    panel.showsHiddenFiles = true
-    panel.directoryURL = URL(fileURLWithPath: NSHomeDirectory() + "/Library/Application Support/Google")
-    guard panel.runModal() == .OK, let folder = panel.url else {
-        log("detect: folder picker cancelled")
-        return nil
-    }
-    let file = folder.appendingPathComponent("Local State")
-    let data: Data
-    do { data = try Data(contentsOf: file) }
-    catch {
-        log("detect: could not read \(file.path) after the folder was chosen: \(error.localizedDescription)")
-        return nil
-    }
-    let profiles = parseLocalState(data)
-    log("detect: read \(profiles.count) profile(s) from the chosen folder")
-    return profiles.isEmpty ? nil : profiles
-}
-
 // MARK: - Icons
 
 /// A bundled icon drawn as a template image, so it follows light/dark mode. Falls back to an SF
 /// Symbol if the file is missing (for example when running outside the app bundle).
-private func icon(_ name: String, fallback: String) -> Image {
+func icon(_ name: String, fallback: String) -> Image {
     if let url = Bundle.main.url(forResource: name, withExtension: "png", subdirectory: "icons"),
        let image = NSImage(contentsOf: url) {
         image.size = NSSize(width: 15, height: 15)
@@ -85,9 +15,9 @@ private func icon(_ name: String, fallback: String) -> Image {
     return Image(systemName: fallback)
 }
 
-// MARK: - Views
+// MARK: - Tab
 
-struct SettingsView: View {
+struct ProfilesTab: View {
     @ObservedObject var store: SettingsStore
 
     var body: some View {
@@ -96,6 +26,7 @@ struct SettingsView: View {
                 Text("Chrome profiles").font(.headline)
                 Text("These appear when you click a link. Double-click a name (or click the pencil) to rename it. Drag a row to change the order.")
                     .font(.callout).foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             ZStack {
@@ -115,6 +46,7 @@ struct SettingsView: View {
                                     .buttonStyle(.borderless)
                                     .foregroundColor(.secondary)
                                     .help("Rename")
+                                    .accessibilityLabel("Rename \(profile.name)")
                             }
                             Spacer()
                             Text(profile.dir).font(.caption).foregroundColor(.secondary)
@@ -122,6 +54,7 @@ struct SettingsView: View {
                                 .buttonStyle(.borderless)
                                 .foregroundColor(.secondary)
                                 .help("Remove \(profile.name)")
+                                .accessibilityLabel("Remove \(profile.name)")
                         }
                         .padding(.vertical, 3)
                     }
@@ -148,30 +81,8 @@ struct SettingsView: View {
             if let status = store.status {
                 Text(status).font(.callout).foregroundColor(.secondary)
             }
-
-            Toggle("Pre-select the profile I used last", isOn: $store.rememberLast)
-
-            Divider()
-
-            HStack(spacing: 8) {
-                Image(systemName: store.isDefault ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                    .foregroundColor(store.isDefault ? .green : .orange)
-                Text(store.isDefault ? "WhichProfile is your default browser."
-                               : "WhichProfile isn't your default browser yet, so links won't show the picker.")
-                    .font(.callout)
-                Spacer()
-                if !store.isDefault {
-                    Button("Make Default…") { makeDefaultBrowser { store.isDefault = isDefaultBrowser() } }
-                }
-            }
         }
         .padding(20)
-        .frame(minWidth: 480, minHeight: 520)
-        .onChange(of: store.list) { _ in store.save() }
-        .onChange(of: store.rememberLast) { _ in store.save() }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            store.isDefault = isDefaultBrowser()
-        }
         .sheet(isPresented: $store.showingAdd) {
             AddProfileSheet(model: store.addModel, isPresented: $store.showingAdd) { dir, name in
                 do { try store.list.add(dir: dir, name: name); return nil }
@@ -209,9 +120,7 @@ struct SettingsView: View {
     }
 
     /// Delete key on the selected rows.
-    private func removeSelected() {
-        confirmRemoval(of: store.selection)
-    }
+    private func removeSelected() { confirmRemoval(of: store.selection) }
 
     private func detect() {
         let found = loadChromeProfiles() ?? profilesFromChosenFolder()
@@ -224,13 +133,7 @@ struct SettingsView: View {
     }
 }
 
-final class AddProfileModel: ObservableObject {
-    @Published var dir = ""
-    @Published var name = ""
-    @Published var error: String?
-
-    func reset() { dir = ""; name = ""; error = nil }
-}
+// MARK: - Add profile sheet
 
 struct AddProfileSheet: View {
     @ObservedObject var model: AddProfileModel
@@ -320,33 +223,4 @@ struct RenameField: NSViewRepresentable {
             DispatchQueue.main.async { self.parent.onDone() }
         }
     }
-}
-
-// MARK: - Window
-
-final class SettingsWindowController: NSObject, NSWindowDelegate {
-    private let window: NSWindow
-    private let onClose: () -> Void
-
-    init(onClose: @escaping () -> Void) {
-        self.onClose = onClose
-        let store = SettingsStore(detect: { loadChromeProfiles() })
-        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 560),
-                          styleMask: [.titled, .closable, .miniaturizable, .resizable],
-                          backing: .buffered, defer: false)
-        window.title = "WhichProfile"
-        window.contentView = NSHostingView(rootView: SettingsView(store: store))
-        window.isReleasedWhenClosed = false
-        window.center()
-        super.init()
-        window.delegate = self
-    }
-
-    func show() {
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-        window.makeKeyAndOrderFront(nil)
-    }
-
-    func windowWillClose(_ notification: Notification) { onClose() }
 }

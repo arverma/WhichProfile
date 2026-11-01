@@ -3,7 +3,7 @@ import AppKit
 private let lastProfileKey = "lastProfile"
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private var picker: Picker?
+    private var picker: LinkPicker?
     private var settings: SettingsWindowController?
     /// The link waiting for a choice, kept while the settings window is open so the popup can return.
     private var pendingURL: URL?
@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.mainMenu = buildMainMenu(target: self)
         // Launched by hand (no link): open the settings window.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [self] in
             if !gotURL { openSettings() }
@@ -31,7 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let preselect = initialSelection(in: profiles, lastUsed: last, config: config)
         let link = prepareLink(url, config: config)
 
-        picker = Picker(profiles: profiles) { chosen, isPrivate in
+        picker = LinkPicker(profiles: profiles) { chosen, isPrivate in
             if let chosen = chosen {
                 UserDefaults.standard.set(chosen.dir, forKey: lastProfileKey)
                 launch(link.url, in: chosen, isPrivate: isPrivate)
@@ -39,16 +40,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // The app is single-shot: quit after every use so nothing lingers.
             NSApp.terminate(nil)
         }
-        picker?.onSettings = { [weak self] in self?.openSettings() }
+        picker?.onSettings = { [weak self] in self?.openSettings(tab: .profiles) }
         picker?.show(url: link.url, cleaned: !link.removed.isEmpty, preselect: preselect, notice: resolved.warning)
     }
 
-    private func openSettings() {
+    private func openSettings(tab: SettingsTab = .general) {
         picker = nil
-        let controller = SettingsWindowController(onClose: { [weak self] in self?.settingsClosed() })
+        if let existing = settings {
+            existing.show(tab: tab)
+            return
+        }
+        let controller = SettingsWindowController(tab: tab, onClose: { [weak self] in self?.settingsClosed() })
         settings = controller
         controller.show()
     }
+
+    // Menu bar actions (see MainMenu.swift).
+    @objc func showAbout() { openSettings(tab: .about) }
+    @objc func showSettings() { openSettings(tab: .general) }
+    @objc func openHelp() { NSWorkspace.shared.open(ProjectInfo.repository) }
+    @objc func openReleases() { NSWorkspace.shared.open(ProjectInfo.releases) }
+    @objc func openIssues() { NSWorkspace.shared.open(ProjectInfo.issues) }
 
     private func settingsClosed() {
         settings = nil

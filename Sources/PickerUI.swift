@@ -149,9 +149,9 @@ final class PickerPanel: NSPanel {
     override func flagsChanged(with event: NSEvent) { onFlagsChanged?() }
 }
 
-// MARK: - Picker controller
+// MARK: - LinkPicker controller
 
-final class Picker {
+final class LinkPicker {
     private let profiles: [Profile]
     /// Called once with the chosen profile and whether to use a private window, or nil if dismissed.
     private let onFinish: (Profile?, Bool) -> Void

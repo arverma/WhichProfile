@@ -290,6 +290,13 @@ try? #"{ "rememberLast": true }"#.write(toFile: newFile, atomically: true, encod
 check(!migrateLegacyConfig(to: newFile, from: legacyFile) && loadConfig(path: newFile).rememberLast == true, "an existing new config is never overwritten")
 check(!migrateLegacyConfig(to: migDir + "/x/config.json", from: migDir + "/missing.json"), "nothing is copied when there is no legacy file")
 
+// MARK: - project info
+
+let diag = ProjectInfo.diagnostics(profileCount: 4, isDefaultBrowser: true)
+check(diag.contains("WhichProfile") && diag.contains("Profiles configured: 4") && diag.contains("Default browser: yes"), "diagnostics list version, profile count and default-browser status")
+check(!diag.contains("http") && !diag.contains("@"), "diagnostics contain no links or addresses")
+check(ProjectInfo.repository.absoluteString == "https://github.com/arverma/WhichProfile" && ProjectInfo.issues.absoluteString.hasSuffix("/issues"), "project links point at the repository")
+
 // MARK: - shared config helpers
 
 let storedConfig = configByStoring([profile("A", "Alpha"), profile("B", "")],
