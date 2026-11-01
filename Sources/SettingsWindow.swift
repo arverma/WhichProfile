@@ -35,6 +35,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     private let window: NSWindow
     private let store: SettingsStore
     private let onClose: () -> Void
+    private var keyMonitor: Any?
 
     init(tab: SettingsTab, onClose: @escaping () -> Void) {
         self.onClose = onClose
@@ -53,10 +54,41 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     /// Brings the window forward, optionally switching to a tab.
     func show(tab: SettingsTab? = nil) {
         if let tab = tab { store.tab = tab }
-        NSApp.setActivationPolicy(.regular)
+        // The app has no Dock icon (it lives in the menu bar), so it must be activated explicitly.
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+        installKeyMonitor()
     }
 
-    func windowWillClose(_ notification: Notification) { onClose() }
+    func windowWillClose(_ notification: Notification) {
+        if let monitor = keyMonitor { NSEvent.removeMonitor(monitor); keyMonitor = nil }
+        onClose()
+    }
+
+    /// An app without a Dock icon shows no menu bar of its own, so the standard editing shortcuts
+    /// are routed by hand: without this, copy and paste would not work in the text fields.
+    private func installKeyMonitor() {
+        guard keyMonitor == nil else { return }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            if NSApp.keyWindow is PickerPanel { return event }   // the popup handles its own keys
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            guard flags == .command || flags == [.command, .shift],
+                  let key = event.charactersIgnoringModifiers?.lowercased() else { return event }
+            let shift = flags.contains(.shift)
+            let action: Selector?
+            switch (key, shift) {
+            case ("x", false): action = #selector(NSText.cut(_:))
+            case ("c", false): action = #selector(NSText.copy(_:))
+            case ("v", false): action = #selector(NSText.paste(_:))
+            case ("a", false): action = #selector(NSText.selectAll(_:))
+            case ("z", false): action = Selector(("undo:"))
+            case ("z", true): action = Selector(("redo:"))
+            case ("w", false): action = #selector(NSWindow.performClose(_:))
+            case ("q", false): action = #selector(NSApplication.terminate(_:))
+            default: action = nil
+            }
+            guard let selector = action, NSApp.sendAction(selector, to: nil, from: nil) else { return event }
+            return nil
+        }
+    }
 }

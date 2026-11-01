@@ -20,6 +20,8 @@ private let features: [FeatureInfo] = [
                 text: "Strips tracking parameters such as utm_*, fbclid and gclid before a link opens. The picker shows a green note when it did, and you can turn this off in General."),
     FeatureInfo(symbol: "clock.arrow.circlepath", title: "Remembers your last choice",
                 text: "The profile you used last is highlighted, so pressing Return reopens it."),
+    FeatureInfo(symbol: "menubar.rectangle", title: "Lives in your menu bar",
+                text: "WhichProfile runs quietly with an icon in the menu bar and no Dock icon. Click the icon to open Settings, check that it is your default browser, turn on Open at login, or quit. If you quit, it starts again the next time you click a link."),
     FeatureInfo(symbol: "slider.horizontal.3", title: "Easy to customise",
                 text: "Rename, reorder, add and remove profiles in the Profiles tab, or detect them from Chrome. Changes save automatically."),
     FeatureInfo(symbol: "lock.shield", title: "Private by design", text: ProjectInfo.privacyStatement),

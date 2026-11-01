@@ -306,6 +306,16 @@ check(chooseExternalBrowser(lookup: { $0 == "com.apple.Safari" ? safariURL : nil
 check(chooseExternalBrowser(lookup: { _ in nil }) == nil, "no browser found gives nil")
 check(!externalBrowserIdentifiers.contains("io.github.arverma.whichprofile"), "the app never picks itself for its own links")
 
+// MARK: - launch policy
+
+check(isLoginLaunch(appleEventSaysLoginItem: true, systemUptime: 99999), "the login-item Apple event marks a login launch")
+check(isLoginLaunch(appleEventSaysLoginItem: false, systemUptime: 30), "a launch just after boot counts as a login launch")
+check(!isLoginLaunch(appleEventSaysLoginItem: false, systemUptime: 3600), "a launch long after boot is a manual launch")
+check(shouldShowSettingsOnLaunch(receivedLink: false, loginLaunch: false, backgroundFlag: false), "a manual launch opens settings")
+check(!shouldShowSettingsOnLaunch(receivedLink: true, loginLaunch: false, backgroundFlag: false), "a launch caused by a link stays quiet")
+check(!shouldShowSettingsOnLaunch(receivedLink: false, loginLaunch: true, backgroundFlag: false), "a login launch stays quiet")
+check(!shouldShowSettingsOnLaunch(receivedLink: false, loginLaunch: false, backgroundFlag: true), "--background stays quiet")
+
 // MARK: - shared config helpers
 
 let storedConfig = configByStoring([profile("A", "Alpha"), profile("B", "")],

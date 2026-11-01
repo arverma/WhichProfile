@@ -29,6 +29,8 @@ final class SettingsStore: ObservableObject {
     @Published var editingID: String?          // the profile whose name is being edited
     @Published var isDefault = isDefaultBrowser()
     @Published var diagnosticsCopied = false
+    @Published var openAtLogin = LoginItem.isEnabled
+    @Published var loginNote: String?
     let addModel = AddProfileModel()
 
     private var config: Config
@@ -60,6 +62,17 @@ final class SettingsStore: ObservableObject {
     }
 
     func refreshDefaultBrowser() { isDefault = isDefaultBrowser() }
+
+    func refreshLoginItem() {
+        openAtLogin = LoginItem.isEnabled
+        loginNote = LoginItem.needsApproval ? "Approve \(ProjectInfo.name) in System Settings → General → Login Items." : nil
+    }
+
+    func setOpenAtLogin(_ on: Bool) {
+        do { try LoginItem.setEnabled(on) }
+        catch { log("could not change the login item: \(error.localizedDescription)") ; loginNote = "Couldn't change this setting: \(error.localizedDescription)"; openAtLogin = LoginItem.isEnabled; return }
+        refreshLoginItem()
+    }
 
     func copyDiagnostics() {
         NSPasteboard.general.clearContents()

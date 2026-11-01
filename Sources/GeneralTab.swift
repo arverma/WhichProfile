@@ -80,6 +80,19 @@ struct GeneralTab: View {
                         }
 
                         VStack(alignment: .leading, spacing: 3) {
+                            Toggle("Open at login", isOn: Binding(get: { store.openAtLogin }, set: { store.setOpenAtLogin($0) }))
+                                .disabled(!LoginItem.isSupported)
+                            Text(LoginItem.isSupported
+                                 ? "Starts \(ProjectInfo.name) quietly in the menu bar when you log in, so the picker is instant. Not required: it also starts when you click a link."
+                                 : "Needs macOS 13 or later.")
+                                .font(.callout).foregroundColor(.secondary).padding(.leading, 20)
+                                .fixedSize(horizontal: false, vertical: true)
+                            if let note = store.loginNote {
+                                Text(note).font(.callout).foregroundColor(.orange).padding(.leading, 20)
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: 3) {
                             Toggle("Remove tracking from links", isOn: $store.cleanLinks)
                             Text("Strips utm_*, fbclid, gclid and similar parameters before opening a link. The picker tells you when it did.")
                                 .font(.callout).foregroundColor(.secondary).padding(.leading, 20)
@@ -89,10 +102,6 @@ struct GeneralTab: View {
                     .padding(8)
                 }
 
-                Text("You don't need to add \(ProjectInfo.name) to Login Items. macOS starts it whenever you click a link, and the default-browser setting survives restarts.")
-                    .font(.callout).foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
                 Button("See everything \(ProjectInfo.name) can do") { store.tab = .features }
                     .buttonStyle(.link)
             }
@@ -100,6 +109,7 @@ struct GeneralTab: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             store.refreshDefaultBrowser()
+            store.refreshLoginItem()
         }
     }
 }

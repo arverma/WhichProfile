@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The link waiting for a choice, kept while the settings window is open so the popup can return.
     private var pendingURL: URL?
     private var gotURL = false
+    private var statusItem: StatusItemController?
 
     func application(_ application: NSApplication, open urls: [URL]) {
         guard let url = urls.first else { return }
@@ -17,10 +18,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = buildMainMenu(target: self)
-        // Launched by hand (no link): open the settings window.
+        statusItem = StatusItemController(app: self)
+
+        // Open the settings window only when the user started the app by hand. A launch caused by a
+        // link, by login, or by --background stays quiet: the menu bar icon is all that appears.
+        let loginLaunch = isLoginLaunch(appleEventSaysLoginItem: launchedAsLoginItem(),
+                                        systemUptime: ProcessInfo.processInfo.systemUptime)
+        let background = CommandLine.arguments.contains("--background")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [self] in
-            if !gotURL { openSettings() }
+            if shouldShowSettingsOnLaunch(receivedLink: gotURL, loginLaunch: loginLaunch, backgroundFlag: background) {
+                openSettings()
+            }
         }
+    }
+
+    /// Opening the app again from Spotlight or Finder while it runs shows the settings window.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        openSettings()
+        return true
+    }
+
+    /// macOS tags login launches with an Apple event property ('prdt' = 'lgit').
+    private func launchedAsLoginItem() -> Bool {
+        guard let property = NSAppleEventManager.shared().currentAppleEvent?.paramDescriptor(forKeyword: 0x7072_6474) else { return false }
+        return property.enumCodeValue == 0x6C67_6974
     }
 
     private func showPicker(for url: URL) {
@@ -43,12 +64,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         picker?.show(url: link.url, cleaned: !link.removed.isEmpty, preselect: preselect, notice: resolved.warning)
     }
 
-    /// The link was opened or dismissed. The app is single-shot, so it quits, unless the settings
-    /// window is open (a link can arrive from another app while you are editing): then it stays.
+    /// The link was opened or dismissed. The app keeps running in the menu bar.
     private func linkFinished() {
         pendingURL = nil
         picker = nil
-        if settings == nil { NSApp.terminate(nil) }
     }
 
     private func openSettings(tab: SettingsTab = .general) {
@@ -70,14 +89,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func openReleases() { openExternalLink(ProjectInfo.releases) }
     @objc func openIssues() { openExternalLink(ProjectInfo.issues) }
 
+    @objc func makeDefaultFromMenu() { makeDefaultBrowser {} }
+
+    @objc func toggleLoginItem() {
+        do { try LoginItem.setEnabled(!LoginItem.isEnabled) }
+        catch {
+            log("could not change the login item: \(error.localizedDescription)")
+            NSApp.activate(ignoringOtherApps: true)
+            let alert = NSAlert()
+            alert.messageText = "Couldn't change Open at Login"
+            alert.informativeText = error.localizedDescription
+            alert.runModal()
+        }
+    }
+
     private func settingsClosed() {
         settings = nil
         if let url = pendingURL {
             // Back to the link that was waiting, now with the edited profile list.
-            NSApp.setActivationPolicy(.accessory)
             showPicker(for: url)
-        } else {
-            NSApp.terminate(nil)
         }
     }
 }
@@ -92,6 +122,7 @@ if CommandLine.arguments.contains("--help") || CommandLine.arguments.contains("-
     Usage: WhichProfile [option]
       --setup           interactively create ~/.config/whichprofile/config.json
       --list-profiles   print the profiles the picker would show
+      --background      start in the menu bar without opening the settings window
       --help            show this help
     """)
     exit(0)

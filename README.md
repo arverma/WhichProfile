@@ -13,11 +13,12 @@ Click a link in Slack, Mail, Notes or any other app and a small popup appears ne
 
 ## Features
 
-- **A profile picker for every link.** The popup appears at your cursor, stays on screen, and quits when you are done, so nothing runs in the background.
+- **A profile picker for every link.** The popup appears at your cursor and stays on screen. WhichProfile lives in the menu bar with no Dock icon, so it is always ready.
 - **Private windows.** Click the glasses on a row, or hold <kbd>⌥</kbd> while choosing, to open the link in a private window of that profile.
 - **Copy link.** Copy the link instead of opening it (<kbd>⌘C</kbd>).
 - **Tracking removal.** Strips `utm_*`, `fbclid`, `gclid` and similar parameters before the link opens, and tells you when it did. Turn it off in Settings.
 - **Remembers your last choice.** The profile you used last is highlighted, so Return reopens it.
+- **Menu bar app.** An icon in the menu bar shows it is running. Its menu opens Settings, shows default-browser status, toggles **Open at login** and quits.
 - **A settings window, not a config file.** Rename, reorder, add and remove profiles, detect them from Chrome, and see at a glance whether it is your default browser.
 - **Private by design.** No network access, no accounts, no analytics. Links are never stored or logged.
 - **Free and open source** (MIT). Native Swift, no dependencies.
@@ -42,7 +43,7 @@ xattr -d com.apple.quarantine ~/Applications/WhichProfile.app
 
 ## Quick start
 
-Open **WhichProfile** from Spotlight. The **General** tab walks you through three steps:
+Open **WhichProfile** from Spotlight. A menu bar icon appears (there is no Dock icon) and the settings window opens on the **General** tab, which walks you through three steps:
 
 1. **Make it your default browser** (one button; macOS asks you to confirm).
 2. **Add your Chrome profiles** in the **Profiles** tab, using **Detect from Chrome** or **Add Profile…**.
@@ -69,7 +70,7 @@ Links clicked *inside* Chrome never go through the default browser, so they are 
 
 ## Settings
 
-The window has four tabs: **General** (setup checklist and options), **Profiles** (rename by double-click or the pencil, drag to reorder, remove with the trash icon after a confirmation, **Add Profile…**, **Detect from Chrome**), **Features** (everything the app can do, with shortcuts) and **About** (version, privacy, links, copyable diagnostics). Changes save automatically.
+Open the window from the menu bar icon (**Settings…**), or by opening WhichProfile again from Spotlight. It has four tabs: **General** (setup checklist and options), **Profiles** (rename by double-click or the pencil, drag to reorder, remove with the trash icon after a confirmation, **Add Profile…**, **Detect from Chrome**), **Features** (everything the app can do, with shortcuts) and **About** (version, privacy, links, copyable diagnostics). Changes save automatically.
 
 ### Finding your profiles
 
@@ -110,12 +111,13 @@ The app's executable has a few options, useful for debugging or when you prefer 
 ```bash
 ~/Applications/WhichProfile.app/Contents/MacOS/WhichProfile --list-profiles   # print the profiles it would show
 ~/Applications/WhichProfile.app/Contents/MacOS/WhichProfile --setup           # edit profiles in a terminal menu
+~/Applications/WhichProfile.app/Contents/MacOS/WhichProfile --background      # start in the menu bar without the settings window
 ~/Applications/WhichProfile.app/Contents/MacOS/WhichProfile --help
 ```
 
 ## Privacy
 
-WhichProfile runs entirely on your Mac. It has no network access, no accounts, no analytics and no tracking. The links you click are handed to Chrome and are never stored. Its log (`~/Library/Logs/WhichProfile.log`) records which profile was used, never the link. The whole app is under 2,000 lines of Swift, so you can read exactly what it does.
+WhichProfile runs entirely on your Mac. It has no network access, no accounts, no analytics and no tracking. It stays running in the menu bar so the picker is instant, and does nothing while idle. The links you click are handed to Chrome and are never stored. Its log (`~/Library/Logs/WhichProfile.log`) records which profile was used, never the link. The whole app is under 2,000 lines of Swift, so you can read exactly what it does.
 
 ## How it works
 
@@ -134,7 +136,9 @@ The `-n` flag is what makes Chrome honour `--profile-directory` even when it is 
 | Links open in Chrome without a popup | WhichProfile is not your default browser. Open it and use **Make Default…** on the General tab |
 | The popup shows an orange "Add your profiles" note | It could not read Chrome's profile list. Add profiles in the Profiles tab |
 | A private window does not open | Chrome profiles managed by an organisation can block private windows. Chrome decides, not WhichProfile |
-| Do I need to add it to Login Items? | No. macOS starts WhichProfile whenever you click a link, and the default-browser setting survives restarts |
+| Do I need to start it at login? | Optional. Turn on **Open at login** in General (or the menu bar icon) for an instant picker after a restart. Without it, macOS starts WhichProfile the first time you click a link |
+| I quit it from the menu bar | It starts again the next time you click a link, or when you open it from Spotlight |
+| There is no Dock icon | By design. Use the menu bar icon to reach Settings |
 | A profile does not open | Check its directory in `chrome://version`. Run `--list-profiles` and read `~/Library/Logs/WhichProfile.log` |
 
 Still stuck? Open an [issue](https://github.com/arverma/WhichProfile/issues) and paste the text from **About → Copy diagnostics** (it contains no links or names).

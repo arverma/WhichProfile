@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Menu bar icon with a menu: Settings, default-browser status, Open at login, About and Quit.
+- **Open at login** option in General and in the menu bar menu (macOS 13 or later).
+- `--background` option to start in the menu bar without opening the settings window.
+
+### Changed
+- WhichProfile now stays running in the menu bar instead of quitting after each link, and has no Dock icon.
+- Opening the app again from Spotlight or Finder shows the settings window. A start caused by a link or by login stays quiet.
+- `build.sh` stops the running copy and restarts the new one quietly.
+
 ### Fixed
 - Links in the About tab and Help menu opened WhichProfile's own picker and then quit the app, because WhichProfile is the default browser. They now open directly in Chrome (or Safari).
 - A link arriving from another app while the settings window was open closed the window after you picked a profile. The window now stays open.

@@ -25,8 +25,15 @@ if [ -d "$HOME/Applications/ProfilePicker.app" ]; then
     rm -rf "$HOME/Applications/ProfilePicker.app"
 fi
 
+# The app now stays running in the menu bar. Stop the old copy first, or it would keep handling
+# links with the old code.
+pkill -x WhichProfile 2>/dev/null && sleep 0.5 || true
+
 mkdir -p "$HOME/Applications"
 rm -rf "$HOME/Applications/WhichProfile.app"
 cp -R "$APP" "$HOME/Applications/WhichProfile.app"
 "$LSREGISTER" -f "$HOME/Applications/WhichProfile.app"
 echo "Installed: $HOME/Applications/WhichProfile.app"
+
+# Start it again quietly (menu bar icon only, no settings window).
+open -g "$HOME/Applications/WhichProfile.app" --args --background
