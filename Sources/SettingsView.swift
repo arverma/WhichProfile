@@ -13,6 +13,7 @@ final class SettingsStore: ObservableObject {
     // installed, @State is a macro whose plugin is missing, so it would not compile.
     @Published var selection = Set<String>()
     @Published var showingAdd = false
+    @Published var editingID: String?   // the profile whose name is being edited
     @Published var isDefault = isDefaultBrowser()
     let addModel = AddProfileModel()
 
@@ -79,16 +80,25 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Chrome profiles").font(.headline)
-                Text("These appear when you click a link. Click a name to rename it, and drag to change the order.")
+                Text("These appear when you click a link. Double-click a name (or click the pencil) to rename it. Drag a row to change the order.")
                     .font(.callout).foregroundColor(.secondary)
             }
 
             ZStack {
                 List(selection: $store.selection) {
                     ForEach($store.list.items) { $profile in
-                        HStack {
-                            TextField("Name", text: $profile.name)
-                                .textFieldStyle(.plain)
+                        HStack(spacing: 6) {
+                            if store.editingID == profile.id {
+                                RenameField(text: $profile.name) { store.editingID = nil }
+                            } else {
+                                Text(profile.name)
+                                    .help("Double-click to rename")
+                                    .simultaneousGesture(TapGesture(count: 2).onEnded { store.editingID = profile.id })
+                                Button { store.editingID = profile.id } label: { Image(systemName: "pencil") }
+                                    .buttonStyle(.borderless)
+                                    .foregroundColor(.secondary)
+                                    .help("Rename")
+                            }
                             Spacer()
                             Text(profile.dir).font(.caption).foregroundColor(.secondary)
                         }
@@ -204,6 +214,64 @@ struct AddProfileSheet: View {
         .textFieldStyle(.roundedBorder)
         .padding(20)
         .frame(width: 400)
+    }
+}
+
+// MARK: - Inline rename field
+
+/// A text field that takes focus as soon as it appears. Return keeps the new name, Esc restores
+/// the old one, and clicking elsewhere keeps what was typed. An empty name is restored.
+struct RenameField: NSViewRepresentable {
+    let text: Binding<String>
+    let onDone: () -> Void
+
+    func makeNSView(context: Context) -> NSTextField {
+        let field = NSTextField(string: text.wrappedValue)
+        field.delegate = context.coordinator
+        field.bezelStyle = .roundedBezel
+        context.coordinator.original = text.wrappedValue
+        DispatchQueue.main.async {
+            field.window?.makeFirstResponder(field)
+            field.currentEditor()?.selectAll(nil)
+        }
+        return field
+    }
+
+    func updateNSView(_ field: NSTextField, context: Context) { context.coordinator.parent = self }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var parent: RenameField
+        var original = ""
+        private var finished = false
+
+        init(_ parent: RenameField) { self.parent = parent }
+
+        func controlTextDidChange(_ notification: Notification) {
+            guard let field = notification.object as? NSTextField else { return }
+            parent.text.wrappedValue = field.stringValue
+        }
+
+        func controlTextDidEndEditing(_ notification: Notification) {
+            if parent.text.wrappedValue.trimmingCharacters(in: .whitespaces).isEmpty {
+                parent.text.wrappedValue = original
+            }
+            finish()
+        }
+
+        func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+            guard selector == #selector(NSResponder.cancelOperation(_:)) else { return false }
+            parent.text.wrappedValue = original
+            finish()
+            return true
+        }
+
+        private func finish() {
+            guard !finished else { return }
+            finished = true
+            DispatchQueue.main.async { self.parent.onDone() }
+        }
     }
 }
 
